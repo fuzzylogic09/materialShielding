@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ShieldCalc 2D — Monte Carlo Shielding Simulator</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<!-- ERROR PANEL -->
+<div id="error-panel">
+  <div class="error-header">
+    <span>⚠</span>
+    <span class="error-header-title">Load Issues — <span id="error-count"></span></span>
+    <span class="error-close" onclick="closeErrorPanel()">✕ Close</span>
+  </div>
+  <div class="error-body" id="error-body"></div>
+</div>
+
+<!-- TOPBAR -->
+<div id="topbar">
+  <div class="logo">Shield<span>Calc</span> 2D</div>
+  <div class="tb-sep"></div>
+  <input type="text" id="sim-title" value="New Simulation" title="Simulation title" placeholder="Simulation title">
+  <div class="tb-sep"></div>
+  <button class="tb-btn" onclick="loadFile()">📂 Load JSON</button>
+  <button class="tb-btn" onclick="exportJSON()">💾 Export JSON</button>
+  <input type="file" id="file-input" accept=".json" style="display:none" onchange="onFileLoad(event)">
+  <div class="tb-sep"></div>
+  <button class="tb-btn" id="lock-all-btn" onclick="toggleLockAll()">🔓 Lock All</button>
+  <div class="tb-sep"></div>
+  <button class="tb-btn primary" id="run-btn" onclick="toggleSimulation()">▶ Run</button>
+  <button class="tb-btn" id="clear-btn" onclick="clearResults()" style="padding:5px 8px" title="Clear results">✕</button>
+</div>
+
+<!-- MAIN -->
+<div id="main">
+
+  <!-- LEFT PANEL -->
+  <div id="left-panel">
+    <div class="panel-tabs">
+      <div class="panel-tab active"  onclick="window._ui.switchTab('objects')">Objects</div>
+      <div class="panel-tab"         onclick="window._ui.switchTab('props')">Properties</div>
+      <div class="panel-tab"         onclick="window._ui.switchTab('calc')">Simulation</div>
+      <div class="panel-tab"         onclick="window._ui.switchTab('mats')">Materials</div>
+    </div>
+    <div class="panel-content">
+
+      <!-- OBJECTS TAB -->
+      <div class="tab-pane active" id="tab-objects">
+        <div id="objects-list">
+          <div class="empty-state">Load a JSON file to view objects,<br>or add new ones below.</div>
+        </div>
+        <div style="margin-top:10px;display:flex;gap:6px;flex-wrap:wrap;">
+          <button class="small-btn" onclick="window._ui.addNewObject('source')">+ Source</button>
+          <button class="small-btn" onclick="window._ui.addNewObject('receptor')">+ Receptor</button>
+          <button class="small-btn" onclick="window._ui.addNewObject('surface')">+ Surface</button>
+          <button class="small-btn accent" onclick="window._ui.openGroupModal()">⛓ Groups</button>
+        </div>
+      </div>
+
+      <!-- PROPERTIES TAB -->
+      <div class="tab-pane" id="tab-props">
+        <div id="prop-content">
+          <div class="empty-state">Select an object to view<br>its properties.</div>
+        </div>
+      </div>
+
+      <!-- SIMULATION TAB -->
+      <div class="tab-pane" id="tab-calc">
+        <div class="sub-tabs" id="calc-sub-tabs">
+          <span class="sub-tab active" data-sub="sim" onclick="window._ui.switchSubTab('tab-calc','sim')">Simulation</span>
+          <span class="sub-tab" data-sub="view" onclick="window._ui.switchSubTab('tab-calc','view')">View</span>
+        </div>
+
+        <!-- Sub-pane: Simulation -->
+        <div class="sub-pane" data-pane="sim">
+          <div class="param-group">
+            <div class="param-group-title">Monte Carlo</div>
+            <div class="prop-row">
+              <span class="prop-key">Ray count</span>
+              <input type="number" class="prop-val" id="p-rayNumber" value="1000" min="1">
+            </div>
+            <div class="prop-row">
+              <span class="prop-key">Batch size</span>
+              <input type="number" class="prop-val" id="p-batchSize" value="50" min="1" max="2000"
+                title="Rays computed per frame. Larger = faster but less responsive UI.">
+            </div>
+          </div>
+          <div style="font-size:11px;color:var(--text3);line-height:1.6;padding:0 2px">
+            All computed rays are stored. Use the <strong style="color:var(--text2)">View</strong> tab
+            to filter which rays are displayed based on their equivalent lead thickness.
+          </div>
+        </div>
+
+        <!-- Sub-pane: View -->
+        <div class="sub-pane" data-pane="view" style="display:none">
+          <div class="param-group">
+            <div class="param-group-title">Display Filter</div>
+            <div class="prop-row">
+              <span class="prop-key">Min Pb equiv</span>
+              <input type="number" class="prop-val" id="p-minThickness" value="0" step="0.1" min="0"
+                title="Show only rays with Pb equiv ≤ this value. Also sets the colorbar and distribution axis.">
+              <span style="color:var(--text3);font-size:11px;width:44px">mm Pb</span>
+            </div>
+            <div style="font-size:11px;color:var(--text3);line-height:1.6;margin-top:2px">
+              Rays with thickness ≤ this threshold are displayed. This value also sets the colorbar scale and distribution X axis.
+            </div>
+          </div>
+          <div class="param-group">
+            <div class="param-group-title">Ray Display</div>
+            <div class="prop-row">
+              <span class="prop-key">Max shown</span>
+              <input type="number" class="prop-val" id="p-plotRayCount" value="100" min="0"
+                title="Maximum number of rays rendered (most recent ones).">
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- MATERIALS TAB -->
+      <div class="tab-pane" id="tab-mats">
+        <div id="materials-list"></div>
+        <button class="small-btn accent" style="margin-top:8px" onclick="window._ui.addMaterial()">+ Add Material</button>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- CANVAS -->
+  <div id="canvas-container">
+    <canvas id="main-canvas"></canvas>
+    <div id="colorbar-container">
+      <span class="cb-label">0</span>
+      <canvas id="colorbar-canvas" height="16"></canvas>
+      <span class="cb-label" id="cb-max-label">— mm Pb</span>
+      <span class="cb-label" style="margin-left:8px;color:var(--text3)">Pb equiv thickness</span>
+    </div>
+  </div>
+
+  <!-- RIGHT PANEL -->
+  <div id="right-panel">
+    <div class="rp-header">📊 Results</div>
+    <div id="progress-bar-container">
+      <div id="progress-track"><div id="progress-fill"></div></div>
+      <div id="progress-text">
+        <span id="p-rays-done">0 rays</span>
+        <span id="p-pct">0%</span>
+      </div>
+    </div>
+    <div id="results-content">
+      <div id="results-stats">
+        <div class="empty-state">Run a simulation to<br>see results here.</div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- STATUS BAR -->
+<div id="statusbar">
+  <div class="stat">X: <span class="stat-val" id="s-x">0.0</span></div>
+  <div class="stat">Y: <span class="stat-val" id="s-y">0.0</span></div>
+  <div class="tb-sep" style="height:14px"></div>
+  <div class="stat">Zoom: <span class="stat-val" id="s-zoom">100%</span></div>
+  <div class="tb-sep" style="height:14px"></div>
+  <div class="stat">Objects: <span class="stat-val" id="s-objcount">0</span></div>
+  <div class="tb-sep" style="height:14px"></div>
+  <div class="stat" id="s-selected-stat" style="display:none">
+    Selected: <span class="stat-val" id="s-selected">—</span>
+  </div>
+</div>
+
+<!-- GROUP MODAL -->
+<div id="modal-overlay" onclick="if(event.target===this) window._ui.closeModal()">
+  <div id="modal-box">
+    <h3>🔗 Linked Uncertainty Groups</h3>
+    <p style="color:var(--text2);font-size:12px;margin-bottom:16px;line-height:1.6">
+      Objects in the same group share the same random displacement per Monte Carlo ray.
+      Useful for objects mounted on the same mechanical support.
+    </p>
+    <div id="groups-content"></div>
+    <div style="display:flex;gap:8px;margin-top:16px">
+      <button class="small-btn accent" onclick="window._ui.addGroup()">+ New Group</button>
+      <button class="small-btn" onclick="window._ui.closeModal()">Close</button>
+    </div>
+  </div>
+</div>
+
+<script type="module" src="js/main.js"></script>
+</body>
+</html>
