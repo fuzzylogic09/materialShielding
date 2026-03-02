@@ -9,5 +9,6 @@
   "dummy": { "density": 8.0, "color": "#80b080" },
   "tungsten alloy WHA":	{"density": 17.0, "color": "#c0a060"},
   "transparent": {"density": 0.0001, "color": "#4080c0"},
-	"poly":	{"density": 0.9, "color": "color": "#4080c0"}
+  "poly":	{"density": 0.9, "color": "color": "#4080c0"},
+  "copper":	{"density": 8.96, "color": "#4080c0"},
 }
