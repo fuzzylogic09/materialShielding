@@ -27,6 +27,7 @@ export function switchSubTab(pane, name) {
 export function refreshUI() {
   renderObjectsList();
   renderMaterials();
+  renderInlineGroups();
   document.getElementById('s-objcount').textContent = Object.keys(state.objects).length;
 }
 
@@ -412,11 +413,58 @@ export function addGroup() {
   const gid = 'g_' + Date.now().toString(36);
   state.groups[gid] = { name, objectNames: [], uncertainty: 0 };
   renderGroupsModal();
+  renderInlineGroups();
+}
+
+// Inline groups panel (in Objects tab — always visible)
+export function renderInlineGroups() {
+  const container = document.getElementById('inline-groups-list');
+  if (!container) return;
+  if (Object.keys(state.groups).length === 0) {
+    container.innerHTML = '<div class="empty-state" style="padding:10px 8px;font-size:11px">No groups yet.</div>';
+    return;
+  }
+  container.innerHTML = '';
+  for (const [gid, g] of Object.entries(state.groups)) {
+    const div = document.createElement('div');
+    div.className = 'param-group';
+    div.style.marginBottom = '8px';
+    div.style.padding = '9px 10px';
+    // Count members
+    const members = g.objectNames.filter(n => state.objects[n]);
+    // Build member options for multi-select
+    const objOptions = Object.keys(state.objects).map(n => {
+      const existingGid = getObjectGroup(n);
+      const inThis = g.objectNames.includes(n);
+      const inOther = existingGid && existingGid !== gid;
+      const label = inOther ? n + ' (other group)' : n;
+      return `<option value="${n}" ${inThis?'selected':''} ${inOther?'disabled':''}>${label}</option>`;
+    }).join('');
+
+    div.innerHTML = `
+      <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px">
+        <span style="font-size:12px;font-weight:600;color:var(--warn);flex:1">${g.name}</span>
+        <span style="font-size:10px;color:var(--text3)">${members.length} obj</span>
+        <span style="cursor:pointer;color:var(--text3);font-size:12px;padding:2px" onclick="window._ui.deleteGroup('${gid}')">✕</span>
+      </div>
+      <div class="prop-row" style="margin-bottom:6px">
+        <span class="prop-key" style="width:70px">Group ±</span>
+        <input type="number" class="prop-val" value="${g.uncertainty||0}" step="0.1" min="0"
+          style="max-width:70px"
+          oninput="window._ui.updateGroupUncertainty('${gid}',this.value)">
+        <span style="color:var(--text3);font-size:11px;white-space:nowrap;margin-left:4px">mm</span>
+      </div>
+      <div style="font-size:10px;color:var(--text3);margin-bottom:4px">Members (Ctrl/Cmd for multi-select):</div>
+      <select multiple style="width:100%;background:var(--bg4);border:1px solid var(--border);color:var(--text);border-radius:4px;padding:3px;font-size:11px;height:64px"
+        onchange="window._ui.updateGroupMembers('${gid}',this)">${objOptions}</select>
+    `;
+    container.appendChild(div);
+  }
 }
 
 export function deleteGroup(gid) {
   delete state.groups[gid];
-  renderGroupsModal(); refreshUI();
+  renderGroupsModal(); refreshUI(); renderInlineGroups();
 }
 
 export function updateGroupMembers(gid, select) {
@@ -436,7 +484,8 @@ export function updateGroupMembers(gid, select) {
   }
   state.groups[gid].objectNames = selected;
   refreshUI();
-  updatePropsPanel(); // update shown group uncertainty in props
+  renderInlineGroups();
+  updatePropsPanel();
   draw();
 }
 
@@ -446,6 +495,7 @@ export function updateGroupUncertainty(gid, value) {
   updatePropsPanel();
   draw();
 }
+
 
 // =============================================
 // RESULTS PANEL
