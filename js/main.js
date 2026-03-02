@@ -24,7 +24,6 @@ window._ui = {
 // also expose for material color inline handlers
 window.state = state;
 window.draw = draw;
-window.toggleTheme = null; // defined in index.html inline script
 
 // =============================================
 // LOAD DEFAULT MATERIALS
