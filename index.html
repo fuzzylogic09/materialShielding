@@ -22,7 +22,7 @@
 <div id="topbar">
   <div class="logo">Shield<span>Calc</span> 2D</div>
   <div class="tb-sep"></div>
-  <div class="theme-switch" id="theme-toggle" onclick="toggleTheme()" title="Toggle dark/light mode">
+  <div class="theme-switch" id="theme-toggle" title="Toggle dark/light mode">
     <span class="switch-icon" id="theme-icon">☀️</span>
     <span id="theme-label">Light</span>
   </div>
@@ -203,17 +203,20 @@
   </div>
 </div>
 
-<script type="module" src="js/main.js"></script>
 <script>
-// Theme toggle — runs synchronously, canvas redraw deferred until module is ready
+// Theme toggle defined BEFORE the ES module so it is always available on window
 function toggleTheme() {
-  const root = document.documentElement;
-  const isLight = root.classList.toggle('light');
-  document.getElementById('theme-icon').textContent = isLight ? '🌙' : '☀️';
-  document.getElementById('theme-label').textContent = isLight ? 'Dark' : 'Light';
-  // Redraw canvas — window.draw is set by the module after DOMContentLoaded
-  requestAnimationFrame(() => { if (window.draw) window.draw(); });
+  var root = document.documentElement;
+  var nowLight = root.classList.toggle('light');
+  document.getElementById('theme-icon').textContent = nowLight ? '🌙' : '☀️';
+  document.getElementById('theme-label').textContent = nowLight ? 'Dark' : 'Light';
+  requestAnimationFrame(function() { if (window.draw) window.draw(); });
 }
+document.addEventListener('DOMContentLoaded', function() {
+  var btn = document.getElementById('theme-toggle');
+  if (btn) btn.addEventListener('click', toggleTheme);
+});
 </script>
+<script type="module" src="js/main.js"></script>
 </body>
 </html>
