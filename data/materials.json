@@ -6,5 +6,8 @@
   "iron": { "density": 7.87, "color": "#8090a0" },
   "aluminum": { "density": 2.70, "color": "#b0c0d0" },
   "water": { "density": 1.0, "color": "#4080c0" },
-  "dummy": { "density": 8.0, "color": "#80b080" }
+  "dummy": { "density": 8.0, "color": "#80b080" },
+  "tungsten alloy WHA":	{"density": 17.0, "color": "#c0a060"},
+  "transparent": {"density": 0.0001, "color": "#4080c0"},
+	"poly":	{"density": 0.9, "color": "color": "#4080c0"}
 }
