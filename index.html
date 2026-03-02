@@ -22,6 +22,11 @@
 <div id="topbar">
   <div class="logo">Shield<span>Calc</span> 2D</div>
   <div class="tb-sep"></div>
+  <div class="theme-switch" id="theme-toggle" onclick="toggleTheme()" title="Toggle dark/light mode">
+    <span class="switch-icon" id="theme-icon">☀️</span>
+    <span id="theme-label">Light</span>
+  </div>
+  <div class="tb-sep"></div>
   <input type="text" id="sim-title" value="New Simulation" title="Simulation title" placeholder="Simulation title">
   <div class="tb-sep"></div>
   <button class="tb-btn" onclick="loadFile()">📂 Load JSON</button>
@@ -189,5 +194,16 @@
 </div>
 
 <script type="module" src="js/main.js"></script>
+<script>
+// Theme toggle (non-module so it's globally accessible inline)
+function toggleTheme() {
+  const root = document.documentElement;
+  const isLight = root.classList.toggle('light');
+  document.getElementById('theme-icon').textContent = isLight ? '🌙' : '☀️';
+  document.getElementById('theme-label').textContent = isLight ? 'Dark' : 'Light';
+  // Re-draw canvas with new theme
+  if (window.draw) window.draw();
+}
+</script>
 </body>
 </html>
