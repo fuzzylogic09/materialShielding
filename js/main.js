@@ -6,7 +6,7 @@ import {
   refreshUI, renderObjectsList, renderMaterials, selectObject, updatePropsPanel,
   switchTab, switchSubTab, updateResultsPanel, addNewObject, toggleLockObj,
   openGroupModal, closeModal, renderGroupsModal, addGroup, deleteGroup,
-  updateGroupMembers, updateGroupUncertainty,
+  updateGroupMembers, updateGroupUncertainty, renderInlineGroups,
   updateObjParam, updateObjUncertainty, updatePoint, updateCircle, addPoint, removePoint,
   renameObject, addMaterial, deleteMaterial, onMatDensityChange
 } from './ui.js';
@@ -17,7 +17,7 @@ import {
 window._ui = {
   switchTab, switchSubTab, selectObject, addNewObject, toggleLockObj,
   openGroupModal, closeModal, renderGroupsModal, addGroup, deleteGroup,
-  updateGroupMembers, updateGroupUncertainty,
+  updateGroupMembers, updateGroupUncertainty, renderInlineGroups,
   updateObjParam, updateObjUncertainty, updatePoint, updateCircle, addPoint, removePoint,
   renameObject, addMaterial, deleteMaterial, onMatDensityChange
 };
@@ -64,6 +64,7 @@ window.onFileLoad = (event) => {
     showIssues(issues);
     if (loaded) {
       refreshUI();
+      renderInlineGroups();
       fitView();
       draw();
     }
@@ -382,6 +383,7 @@ async function init() {
   });
 
   refreshUI();
+  renderInlineGroups();
   resizeCanvas();
   fitView();
   draw();
