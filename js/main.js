@@ -5,9 +5,10 @@ import { startSimulation, stopSimulation } from './simulation.js';
 import {
   refreshUI, renderObjectsList, renderMaterials, selectObject, updatePropsPanel,
   switchTab, switchSubTab, updateResultsPanel, addNewObject, toggleLockObj,
-  openGroupModal, closeModal, renderGroupsModal, addGroup, deleteGroup, updateGroupMembers,
+  openGroupModal, closeModal, renderGroupsModal, addGroup, deleteGroup,
+  updateGroupMembers, updateGroupUncertainty,
   updateObjParam, updateObjUncertainty, updatePoint, updateCircle, addPoint, removePoint,
-  renameObject, addMaterial, deleteMaterial
+  renameObject, addMaterial, deleteMaterial, onMatDensityChange
 } from './ui.js';
 
 // =============================================
@@ -15,13 +16,15 @@ import {
 // =============================================
 window._ui = {
   switchTab, switchSubTab, selectObject, addNewObject, toggleLockObj,
-  openGroupModal, closeModal, renderGroupsModal, addGroup, deleteGroup, updateGroupMembers,
+  openGroupModal, closeModal, renderGroupsModal, addGroup, deleteGroup,
+  updateGroupMembers, updateGroupUncertainty,
   updateObjParam, updateObjUncertainty, updatePoint, updateCircle, addPoint, removePoint,
-  renameObject, addMaterial, deleteMaterial
+  renameObject, addMaterial, deleteMaterial, onMatDensityChange
 };
 // also expose for material color inline handlers
 window.state = state;
 window.draw = draw;
+window.toggleTheme = null; // defined in index.html inline script
 
 // =============================================
 // LOAD DEFAULT MATERIALS
