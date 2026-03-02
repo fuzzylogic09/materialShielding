@@ -15,11 +15,51 @@
   --text: #e8eaf0;
   --text2: #8892a8;
   --text3: #5a6380;
+  --canvas-bg: #0d0f14;
   --font-mono: 'JetBrains Mono', monospace;
   --font-ui: 'Space Grotesk', sans-serif;
   --panel-w: 320px;
   --radius: 8px;
 }
+
+:root.light {
+  --bg: #f0f2f7;
+  --bg2: #ffffff;
+  --bg3: #e8eaf2;
+  --bg4: #d8dce8;
+  --border: #c8ccd8;
+  --border2: #a8b0c8;
+  --accent: #1a68d0;
+  --accent2: #1050aa;
+  --accent3: #007a60;
+  --warn: #cc4400;
+  --warn2: #aa8800;
+  --text: #1a1e2a;
+  --text2: #454e68;
+  --text3: #7880a0;
+  --canvas-bg: #f5f7fc;
+  --font-mono: 'JetBrains Mono', monospace;
+  --font-ui: 'Space Grotesk', sans-serif;
+  --panel-w: 320px;
+  --radius: 8px;
+}
+
+/* ---- THEME SWITCH ---- */
+.theme-switch {
+  display: flex; align-items: center; gap: 6px;
+  padding: 4px 10px;
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  cursor: pointer;
+  font-size: 11px;
+  color: var(--text2);
+  transition: all 0.15s;
+  white-space: nowrap;
+  user-select: none;
+}
+.theme-switch:hover { background: var(--bg4); color: var(--text); border-color: var(--border2); }
+.theme-switch .switch-icon { font-size: 13px; line-height: 1; }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
