@@ -61,7 +61,17 @@
           <button class="small-btn" onclick="window._ui.addNewObject('source')">+ Source</button>
           <button class="small-btn" onclick="window._ui.addNewObject('receptor')">+ Receptor</button>
           <button class="small-btn" onclick="window._ui.addNewObject('surface')">+ Surface</button>
-          <button class="small-btn accent" onclick="window._ui.openGroupModal()">⛓ Groups</button>
+        </div>
+
+        <!-- INLINE GROUPS SECTION -->
+        <div style="margin-top:14px">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+            <span style="font-size:10px;text-transform:uppercase;letter-spacing:0.08em;color:var(--text3);font-weight:600">⛓ Uncertainty Groups</span>
+            <button class="small-btn accent" style="padding:3px 8px;font-size:10px" onclick="window._ui.addGroup();window._ui.renderInlineGroups()">+ New Group</button>
+          </div>
+          <div id="inline-groups-list">
+            <div class="empty-state" style="padding:12px 8px;font-size:11px">No groups yet.</div>
+          </div>
         </div>
       </div>
 
@@ -195,14 +205,14 @@
 
 <script type="module" src="js/main.js"></script>
 <script>
-// Theme toggle (non-module so it's globally accessible inline)
+// Theme toggle — runs synchronously, canvas redraw deferred until module is ready
 function toggleTheme() {
   const root = document.documentElement;
   const isLight = root.classList.toggle('light');
   document.getElementById('theme-icon').textContent = isLight ? '🌙' : '☀️';
   document.getElementById('theme-label').textContent = isLight ? 'Dark' : 'Light';
-  // Re-draw canvas with new theme
-  if (window.draw) window.draw();
+  // Redraw canvas — window.draw is set by the module after DOMContentLoaded
+  requestAnimationFrame(() => { if (window.draw) window.draw(); });
 }
 </script>
 </body>
