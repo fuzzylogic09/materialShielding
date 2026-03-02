@@ -34,47 +34,40 @@ function rayIntersectSegment(rx1, ry1, rx2, ry2, sx1, sy1, sx2, sy2) {
 }
 
 // =============================================
-// POINT ON POLYLINE
+// RANDOM POINT ON POLYLINE
 // =============================================
 function randomPointOnPolyline(pts) {
   if (pts.length === 2) {
     const t = Math.random();
-    return [
-      pts[0][0] + t * (pts[1][0] - pts[0][0]),
-      pts[0][1] + t * (pts[1][1] - pts[0][1])
-    ];
+    return [pts[0][0] + t*(pts[1][0]-pts[0][0]), pts[0][1] + t*(pts[1][1]-pts[0][1])];
   }
   let total = 0;
   const lengths = [];
   for (let i = 0; i < pts.length - 1; i++) {
     const l = Math.hypot(pts[i+1][0]-pts[i][0], pts[i+1][1]-pts[i][1]);
-    total += l;
-    lengths.push(l);
+    total += l; lengths.push(l);
   }
   let r = Math.random() * total;
   for (let i = 0; i < lengths.length; i++) {
     if (r <= lengths[i]) {
       const t = r / lengths[i];
-      return [
-        pts[i][0] + t * (pts[i+1][0] - pts[i][0]),
-        pts[i][1] + t * (pts[i+1][1] - pts[i][1])
-      ];
+      return [pts[i][0]+t*(pts[i+1][0]-pts[i][0]), pts[i][1]+t*(pts[i+1][1]-pts[i][1])];
     }
     r -= lengths[i];
   }
-  return [...pts[pts.length - 1]];
+  return [...pts[pts.length-1]];
 }
 
 // =============================================
-// GROUP DISPLACEMENTS  (one per ray)
+// DISPLACEMENTS PER RAY
+// Each group gets one shared displacement (from group.uncertainty).
+// Each object additionally gets its own displacement (from obj.parameters.uncertainty).
+// Total displacement for an object = group_disp + own_disp
 // =============================================
 function computeGroupDisplacements() {
   const disp = {};
   for (const [gid, g] of Object.entries(state.groups)) {
-    let unc = 0;
-    for (const n of g.objectNames) {
-      if (state.objects[n]) { unc = state.objects[n].parameters?.uncertainty || 0; break; }
-    }
+    const unc = g.uncertainty || 0;
     const angle = Math.random() * Math.PI * 2;
     const mag = Math.random() * unc;
     disp[gid] = { dx: Math.cos(angle) * mag, dy: Math.sin(angle) * mag };
@@ -83,13 +76,25 @@ function computeGroupDisplacements() {
 }
 
 function getObjDisplacement(name, groupDisp) {
+  let dx = 0, dy = 0;
+
+  // Group displacement (shared with all members)
   const gid = getObjectGroup(name);
-  if (gid && groupDisp[gid]) return groupDisp[gid];
-  const unc = state.objects[name]?.parameters?.uncertainty || 0;
-  if (!unc) return { dx: 0, dy: 0 };
-  const angle = Math.random() * Math.PI * 2;
-  const mag = Math.random() * unc;
-  return { dx: Math.cos(angle) * mag, dy: Math.sin(angle) * mag };
+  if (gid && groupDisp[gid]) {
+    dx += groupDisp[gid].dx;
+    dy += groupDisp[gid].dy;
+  }
+
+  // Individual displacement (independent)
+  const ownUnc = state.objects[name]?.parameters?.uncertainty || 0;
+  if (ownUnc > 0) {
+    const angle = Math.random() * Math.PI * 2;
+    const mag = Math.random() * ownUnc;
+    dx += Math.cos(angle) * mag;
+    dy += Math.sin(angle) * mag;
+  }
+
+  return { dx, dy };
 }
 
 // =============================================
@@ -114,30 +119,27 @@ function computeRayThickness(x1, y1, x2, y2, groupDisp) {
       const r = Math.abs(obj.points[1]);
       const ts = rayIntersectCircle(x1, y1, x2, y2, cx, cy, r);
       if (ts.length === 2) {
-        const t1 = ts[0], t2 = ts[1];
-        const px1 = x1 + t1 * (x2-x1), py1 = y1 + t1 * (y2-y1);
-        const px2 = x1 + t2 * (x2-x1), py2 = y1 + t2 * (y2-y1);
-        totalPbEquiv += Math.hypot(px2-px1, py2-py1) * ratio;
+        const p1x = x1+ts[0]*(x2-x1), p1y = y1+ts[0]*(y2-y1);
+        const p2x = x1+ts[1]*(x2-x1), p2y = y1+ts[1]*(y2-y1);
+        totalPbEquiv += Math.hypot(p2x-p1x, p2y-p1y) * ratio;
       }
     } else {
       const pts = obj.points;
       if (!pts || pts.length < 3) continue;
       const tVals = [];
       for (let i = 0; i < pts.length; i++) {
-        const j = (i + 1) % pts.length;
-        const sx1 = pts[i][0] + d.dx, sy1 = pts[i][1] + d.dy;
-        const sx2 = pts[j][0] + d.dx, sy2 = pts[j][1] + d.dy;
-        const t = rayIntersectSegment(x1, y1, x2, y2, sx1, sy1, sx2, sy2);
+        const j = (i+1) % pts.length;
+        const t = rayIntersectSegment(x1, y1, x2, y2,
+          pts[i][0]+d.dx, pts[i][1]+d.dy,
+          pts[j][0]+d.dx, pts[j][1]+d.dy);
         if (t !== null) tVals.push(t);
       }
-      tVals.sort((a, b) => a - b);
-      // Remove duplicates (shared vertices)
-      const unique = tVals.filter((v, i, arr) => i === 0 || Math.abs(v - arr[i-1]) > 1e-7);
-      for (let i = 0; i + 1 < unique.length; i += 2) {
-        const t1 = unique[i], t2 = unique[i+1];
-        const px1 = x1 + t1*(x2-x1), py1 = y1 + t1*(y2-y1);
-        const px2 = x1 + t2*(x2-x1), py2 = y1 + t2*(y2-y1);
-        totalPbEquiv += Math.hypot(px2-px1, py2-py1) * ratio;
+      tVals.sort((a,b) => a-b);
+      const unique = tVals.filter((v,i,arr) => i===0 || Math.abs(v-arr[i-1])>1e-7);
+      for (let i = 0; i+1 < unique.length; i+=2) {
+        const p1x = x1+unique[i]*(x2-x1), p1y = y1+unique[i]*(y2-y1);
+        const p2x = x1+unique[i+1]*(x2-x1), p2y = y1+unique[i+1]*(y2-y1);
+        totalPbEquiv += Math.hypot(p2x-p1x, p2y-p1y) * ratio;
       }
     }
   }
@@ -161,7 +163,6 @@ export function startSimulation(onUpdate) {
     state.simulation.running = false;
     return false;
   }
-
   scheduleBatch(sources, receptors);
   return true;
 }
@@ -202,12 +203,12 @@ function runBatch(sources, receptors) {
   const groupDisp = computeGroupDisplacements();
 
   for (let i = 0; i < toCompute; i++) {
-    const src = sources[Math.floor(Math.random() * sources.length)];
-    const rec = receptors[Math.floor(Math.random() * receptors.length)];
+    const src = sources[Math.floor(Math.random()*sources.length)];
+    const rec = receptors[Math.floor(Math.random()*receptors.length)];
     const p1 = randomPointOnPolyline(src.points);
     const p2 = randomPointOnPolyline(rec.points);
     const thickness = computeRayThickness(p1[0], p1[1], p2[0], p2[1], groupDisp);
-    state.simulation.rays.push({ x1: p1[0], y1: p1[1], x2: p2[0], y2: p2[1], thickness });
+    state.simulation.rays.push({ x1:p1[0], y1:p1[1], x2:p2[0], y2:p2[1], thickness });
     state.simulation.raysComputed++;
   }
 
