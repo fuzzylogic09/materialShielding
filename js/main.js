@@ -362,10 +362,12 @@ function onWheel(e) {
 // PARAM CHANGE → REDRAW (display only)
 // =============================================
 const minThicknessSlider = document.getElementById('p-minThickness');
+const minThicknessNum    = document.getElementById('p-minThickness-num');
 const minThicknessLabel = document.getElementById('p-minThickness-label');
 
 function syncSlider() {
   const val = parseFloat(minThicknessSlider.value) || 0;
+  minThicknessNum.value = val;                      // ← ADD
   minThicknessLabel.textContent = val.toFixed(1) + ' mm Pb';
   draw();
   updateResultsPanel();
@@ -374,16 +376,15 @@ if (minThicknessSlider) {
   minThicknessSlider.addEventListener('input', syncSlider);
 }
 
-const plotRayCountEl = document.getElementById('p-plotRayCount');
-if (plotRayCountEl) plotRayCountEl.addEventListener('input', () => { draw(); updateResultsPanel(); });
-
-// Clamp ray count between 1000 and 1000000
-const rayNumberEl = document.getElementById('p-rayNumber');
-if (rayNumberEl) {
-  rayNumberEl.addEventListener('change', () => {
-    let v = parseInt(rayNumberEl.value) || 1000;
-    v = Math.max(1000, Math.min(1000000, v));
-    rayNumberEl.value = v;
+// ← ADD: typing in the number box updates the slider
+if (minThicknessNum) {
+  minThicknessNum.addEventListener('input', () => {
+    let val = parseFloat(minThicknessNum.value) || 0;
+    val = Math.max(0, Math.min(500, val));
+    minThicknessSlider.value = val;
+    minThicknessLabel.textContent = val.toFixed(1) + ' mm Pb';
+    draw();
+    updateResultsPanel();
   });
 }
 
