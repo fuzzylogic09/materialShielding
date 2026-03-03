@@ -8,7 +8,7 @@ import {
   openGroupModal, closeModal, renderGroupsModal, addGroup, deleteGroup,
   updateGroupMembers, updateGroupUncertainty, renderInlineGroups,
   updateObjParam, updateObjUncertainty, updatePoint, updateCircle, addPoint, removePoint,
-  renameObject, addMaterial, deleteMaterial, onMatDensityChange
+  renameObject, addMaterial, deleteMaterial, onMatDensityChange, pasteCreoPoints
 } from './ui.js';
 
 // =============================================
@@ -19,7 +19,7 @@ window._ui = {
   openGroupModal, closeModal, renderGroupsModal, addGroup, deleteGroup,
   updateGroupMembers, updateGroupUncertainty, renderInlineGroups,
   updateObjParam, updateObjUncertainty, updatePoint, updateCircle, addPoint, removePoint,
-  renameObject, addMaterial, deleteMaterial, onMatDensityChange
+  renameObject, addMaterial, deleteMaterial, onMatDensityChange, pasteCreoPoints
 };
 // also expose for material color inline handlers
 window.state = state;
@@ -59,6 +59,17 @@ window.onFileLoad = (event) => {
   if (!file) return;
   const reader = new FileReader();
   reader.onload = (e) => {
+    // Reset simulation state before loading new file
+    stopSimulation();
+    state.simulation.rays = [];
+    state.simulation.raysComputed = 0;
+    setRunBtn(false);
+    const progressFill = document.getElementById('progress-fill');
+    if (progressFill) progressFill.style.width = '0%';
+    document.getElementById('p-rays-done').textContent = '0 rays';
+    document.getElementById('p-pct').textContent = '0%';
+    document.getElementById('results-stats').innerHTML = '';
+
     const { loaded, issues } = importFromJSON(e.target.result);
     showIssues(issues);
     if (loaded) {
@@ -348,10 +359,31 @@ function onWheel(e) {
 // =============================================
 // PARAM CHANGE → REDRAW (display only)
 // =============================================
-['p-minThickness', 'p-plotRayCount'].forEach(id => {
-  const el = document.getElementById(id);
-  if (el) el.addEventListener('input', () => { draw(); updateResultsPanel(); });
-});
+const minThicknessSlider = document.getElementById('p-minThickness');
+const minThicknessLabel = document.getElementById('p-minThickness-label');
+
+function syncSlider() {
+  const val = parseFloat(minThicknessSlider.value) || 0;
+  minThicknessLabel.textContent = val.toFixed(1) + ' mm Pb';
+  draw();
+  updateResultsPanel();
+}
+if (minThicknessSlider) {
+  minThicknessSlider.addEventListener('input', syncSlider);
+}
+
+const plotRayCountEl = document.getElementById('p-plotRayCount');
+if (plotRayCountEl) plotRayCountEl.addEventListener('input', () => { draw(); updateResultsPanel(); });
+
+// Clamp ray count between 1000 and 1000000
+const rayNumberEl = document.getElementById('p-rayNumber');
+if (rayNumberEl) {
+  rayNumberEl.addEventListener('change', () => {
+    let v = parseInt(rayNumberEl.value) || 1000;
+    v = Math.max(1000, Math.min(1000000, v));
+    rayNumberEl.value = v;
+  });
+}
 
 document.getElementById('sim-title').addEventListener('input', e => {
   state.params.title = e.target.value;
