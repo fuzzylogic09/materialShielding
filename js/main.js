@@ -368,7 +368,6 @@ const minThicknessLabel = document.getElementById('p-minThickness-label');
 function syncSlider() {
   const val = parseFloat(minThicknessSlider.value) || 0;
   minThicknessNum.value = val;                      // ← ADD
-  minThicknessLabel.textContent = val.toFixed(1) + ' mm Pb';
   draw();
   updateResultsPanel();
 }
@@ -376,13 +375,11 @@ if (minThicknessSlider) {
   minThicknessSlider.addEventListener('input', syncSlider);
 }
 
-// ← ADD: typing in the number box updates the slider
 if (minThicknessNum) {
   minThicknessNum.addEventListener('input', () => {
     let val = parseFloat(minThicknessNum.value) || 0;
     val = Math.max(0, Math.min(500, val));
     minThicknessSlider.value = val;
-    minThicknessLabel.textContent = val.toFixed(1) + ' mm Pb';
     draw();
     updateResultsPanel();
   });
