@@ -146,6 +146,10 @@ export function updatePropsPanel() {
       <div class="prop-row"><span class="prop-key">Group</span>
         <span style="color:${groupId?'var(--warn)':'var(--text3)'};font-size:12px;flex:1">${groupId ? state.groups[groupId].name : '—'}</span>
       </div>
+      <div class="prop-row" style="margin-top:6px">
+        <button class="small-btn" style="color:var(--warn);border-color:var(--warn);background:rgba(255,123,79,0.08)" onclick="window._ui.deleteObject('${name}')">🗑 Delete Object</button>
+      </div>  
+      
     </div>
 
     ${type === 'surface' ? `
@@ -312,6 +316,23 @@ export function toggleLockObj(name) {
   state.objects[name].locked = !state.objects[name].locked;
   renderObjectsList(); updatePropsPanel();
 }
+
+export function deleteObject(name) {
+  if (!state.objects[name]) return;
+  if (!confirm(`Delete "${name}"?`)) return;
+  // Remove from any groups
+  for (const g of Object.values(state.groups)) {
+    const idx = g.objectNames.indexOf(name);
+    if (idx >= 0) g.objectNames.splice(idx, 1);
+  }
+  delete state.objects[name];
+  state.selectedObj = null;
+  document.getElementById('s-selected-stat').style.display = 'none';
+  refreshUI();
+  updatePropsPanel();
+  draw();
+}
+
 
 // =============================================
 // MATERIALS  — live update of Pb ratio
