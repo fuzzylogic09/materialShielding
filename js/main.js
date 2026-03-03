@@ -61,6 +61,8 @@ window.onFileLoad = (event) => {
   reader.onload = (e) => {
     // Reset simulation state before loading new file
     stopSimulation();
+    state.lockedAll = true;
+    document.getElementById('lock-all-btn').textContent = '🔒 Unlock All';
     state.simulation.rays = [];
     state.simulation.raysComputed = 0;
     setRunBtn(false);
