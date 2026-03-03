@@ -8,7 +8,7 @@ import {
   openGroupModal, closeModal, renderGroupsModal, addGroup, deleteGroup,
   updateGroupMembers, updateGroupUncertainty, renderInlineGroups,
   updateObjParam, updateObjUncertainty, updatePoint, updateCircle, addPoint, removePoint,
-  renameObject, addMaterial, deleteMaterial, onMatDensityChange, pasteCreoPoints
+  renameObject, addMaterial, deleteMaterial, onMatDensityChange, pasteCreoPoints, deleteObject 
 } from './ui.js';
 
 // =============================================
@@ -19,7 +19,7 @@ window._ui = {
   openGroupModal, closeModal, renderGroupsModal, addGroup, deleteGroup,
   updateGroupMembers, updateGroupUncertainty, renderInlineGroups,
   updateObjParam, updateObjUncertainty, updatePoint, updateCircle, addPoint, removePoint,
-  renameObject, addMaterial, deleteMaterial, onMatDensityChange, pasteCreoPoints
+  renameObject, addMaterial, deleteMaterial, onMatDensityChange, pasteCreoPoints, deleteObject 
 };
 // also expose for material color inline handlers
 window.state = state;
