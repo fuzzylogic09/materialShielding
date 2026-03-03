@@ -81,16 +81,24 @@ function drawGrid() {
   ctx.moveTo(0, oy); ctx.lineTo(canvas.width, oy);
   ctx.stroke();
 
-  // Axis labels
+  // Axis labels — only draw if labels won't overlap
+  const minLabelSpacing = 40; // px minimum between labels
   ctx.font = '9px JetBrains Mono, monospace';
   ctx.fillStyle = tc('rgba(90,99,128,0.7)', 'rgba(100,110,150,0.9)');
-  ctx.textAlign = 'center';
-  for (let x = ((ox % majorSpacing) + majorSpacing) % majorSpacing; x < canvas.width; x += majorSpacing) {
-    ctx.fillText(((x - ox) / zoom).toFixed(0), x, Math.min(oy + 12, canvas.height - 2));
+
+  // X labels: only draw if majorSpacing is wide enough
+  if (majorSpacing >= minLabelSpacing) {
+    ctx.textAlign = 'center';
+    for (let x = ((ox % majorSpacing) + majorSpacing) % majorSpacing; x < canvas.width; x += majorSpacing) {
+      ctx.fillText(((x - ox) / zoom).toFixed(0), x, Math.min(oy + 12, canvas.height - 2));
+    }
   }
-  ctx.textAlign = 'right';
-  for (let y = ((oy % majorSpacing) + majorSpacing) % majorSpacing; y < canvas.height; y += majorSpacing) {
-    ctx.fillText((-(y - oy) / zoom).toFixed(0), Math.max(ox - 4, 30), y + 3);
+  // Y labels: only draw if majorSpacing is tall enough
+  if (majorSpacing >= minLabelSpacing) {
+    ctx.textAlign = 'right';
+    for (let y = ((oy % majorSpacing) + majorSpacing) % majorSpacing; y < canvas.height; y += majorSpacing) {
+      ctx.fillText((-(y - oy) / zoom).toFixed(0), Math.max(ox - 4, 30), y + 3);
+    }
   }
   ctx.restore();
 }
