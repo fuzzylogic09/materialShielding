@@ -363,7 +363,6 @@ function onWheel(e) {
 // =============================================
 const minThicknessSlider = document.getElementById('p-minThickness');
 const minThicknessNum    = document.getElementById('p-minThickness-num');
-const minThicknessLabel = document.getElementById('p-minThickness-label');
 
 function syncSlider() {
   const val = parseFloat(minThicknessSlider.value) || 0;
