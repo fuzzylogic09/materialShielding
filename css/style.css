@@ -230,7 +230,36 @@ body {
   font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em;
   color: var(--text3); margin-bottom: 8px; font-weight: 600;
 }
-.prop-row { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+/* ---- RANGE SLIDER ---- */
+input[type="range"].prop-val {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 4px;
+  background: var(--bg4);
+  border: none;
+  border-radius: 2px;
+  padding: 0;
+  cursor: pointer;
+}
+input[type="range"].prop-val::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 14px; height: 14px;
+  border-radius: 50%;
+  background: var(--accent);
+  cursor: pointer;
+  border: 2px solid var(--bg2);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+input[type="range"].prop-val::-moz-range-thumb {
+  width: 14px; height: 14px;
+  border-radius: 50%;
+  background: var(--accent);
+  cursor: pointer;
+  border: 2px solid var(--bg2);
+}
+input[type="range"].prop-val:focus { border-color: transparent; outline: none; }
+
+.prop-row { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; flex-wrap: wrap; }
 .prop-key { width: 90px; flex-shrink: 0; color: var(--text3); font-size: 12px; }
 .prop-val {
   flex: 1;
