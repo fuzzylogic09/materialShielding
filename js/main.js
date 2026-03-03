@@ -367,8 +367,7 @@ const minThicknessNum    = document.getElementById('p-minThickness-num');
 function syncSlider() {
   const val = parseFloat(minThicknessSlider.value) || 0;
   minThicknessNum.value = val;                      // ← ADD
-  draw();
-  updateResultsPanel();
+  requestAnimationFrame(() => { draw(); updateResultsPanel(); });  // ← change
 }
 if (minThicknessSlider) {
   minThicknessSlider.addEventListener('input', syncSlider);
@@ -379,8 +378,7 @@ if (minThicknessNum) {
     let val = parseFloat(minThicknessNum.value) || 0;
     val = Math.max(0, Math.min(500, val));
     minThicknessSlider.value = val;
-    draw();
-    updateResultsPanel();
+    requestAnimationFrame(() => { draw(); updateResultsPanel(); });  // ← change
   });
 }
 
