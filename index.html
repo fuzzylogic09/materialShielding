@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="light">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -23,8 +23,8 @@
   <div class="logo">Shield<span>Calc</span> 2D</div>
   <div class="tb-sep"></div>
   <div class="theme-switch" id="theme-toggle" title="Toggle dark/light mode">
-    <span class="switch-icon" id="theme-icon">☀️</span>
-    <span id="theme-label">Light</span>
+    <span class="switch-icon" id="theme-icon">🌙</span>
+    <span id="theme-label">Dark</span>
   </div>
   <div class="tb-sep"></div>
   <input type="text" id="sim-title" value="New Simulation" title="Simulation title" placeholder="Simulation title">
@@ -95,12 +95,17 @@
             <div class="param-group-title">Monte Carlo</div>
             <div class="prop-row">
               <span class="prop-key">Ray count</span>
-              <input type="number" class="prop-val" id="p-rayNumber" value="1000" min="1">
+              <input type="number" class="prop-val" id="p-rayNumber" value="1000" min="1000" max="1000000">
             </div>
             <div class="prop-row">
               <span class="prop-key">Batch size</span>
               <input type="number" class="prop-val" id="p-batchSize" value="50" min="1" max="2000"
                 title="Rays computed per frame. Larger = faster but less responsive UI.">
+            </div>
+            <div style="font-size:11px;color:var(--text3);line-height:1.6;padding:0 2px;margin-top:4px">
+              <strong style="color:var(--text2)">Batch size</strong> controls how many rays are computed per animation frame.
+              A larger value (e.g. 500) runs faster but may freeze the UI during computation.
+              A smaller value (e.g. 10–50) keeps the interface responsive but is slower overall.
             </div>
           </div>
           <div style="font-size:11px;color:var(--text3);line-height:1.6;padding:0 2px">
@@ -113,12 +118,12 @@
         <div class="sub-pane" data-pane="view" style="display:none">
           <div class="param-group">
             <div class="param-group-title">Display Filter</div>
-            <div class="prop-row">
+            <div class="prop-row" style="flex-wrap:wrap;gap:6px">
               <span class="prop-key">Min Pb equiv</span>
-              <!-- <input type="range" min="0" max="500" value="203" class="prop-val" id="p-minThickness" title="Show only rays with Pb equiv ≤ this value. Also sets the colorbar and distribution axis."> -->
-              <input type="number" class="prop-val" id="p-minThickness" value="0" step="0.1" min="0"
-                title="Show only rays with Pb equiv ≤ this value. Also sets the colorbar and distribution axis.">
-              <span style="color:var(--text3);font-size:11px;width:44px">mm Pb</span>
+              <input type="range" min="0" max="500" value="0" step="0.5" class="prop-val" id="p-minThickness"
+                title="Show only rays with Pb equiv ≤ this value. Also sets the colorbar and distribution axis."
+                style="min-width:0;flex:1">
+              <span style="color:var(--accent);font-family:var(--font-mono);font-size:11px;white-space:nowrap;min-width:60px;text-align:right" id="p-minThickness-label">0.0 mm Pb</span>
             </div>
             <div style="font-size:11px;color:var(--text3);line-height:1.6;margin-top:2px">
               Rays with thickness ≤ this threshold are displayed. This value also sets the colorbar scale and distribution X axis.
