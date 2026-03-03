@@ -90,6 +90,8 @@ export function importFromJSON(raw) {
   }
 
   if (mats) {
+    // JSON materials supersede all existing ones — clear first, then populate
+    state.materials = {};
     for (const [k, v] of Object.entries(mats)) {
       if (typeof v !== 'object' || v === null) {
         issues.push({
