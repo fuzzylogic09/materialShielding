@@ -201,7 +201,14 @@ export function updatePropsPanel() {
     <div class="prop-section">
       <div class="prop-label">Points / Geometry</div>
       <table class="points-table">${pointsHTML}</table>
-      ${geo !== 'circle' ? `<button class="small-btn" style="margin-top:6px" onclick="window._ui.addPoint('${name}')">+ Add Point</button>` : ''}
+      ${geo !== 'circle' ? `
+      <div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap">
+        <button class="small-btn" onclick="window._ui.addPoint('${name}')">+ Add Point</button>
+        <button class="small-btn accent" title="Paste XYZ coordinates from Creo clipboard (X,Y,Z per line — X and Z are used)" onclick="window._ui.pasteCreoPoints('${name}')">📋 Paste from Creo</button>
+      </div>
+      <div style="font-size:10px;color:var(--text3);line-height:1.5;margin-top:6px">
+        Creo format: one number per line (X, Y, Z repeating). X and Z values are imported as the 2D X and Y coordinates.
+      </div>` : ''}
     </div>
   `;
 }
@@ -248,6 +255,45 @@ export function removePoint(name, i) {
   updatePropsPanel(); draw();
 }
 
+export async function pasteCreoPoints(name) {
+  if (!state.objects[name]) return;
+  let text = '';
+  try {
+    text = await navigator.clipboard.readText();
+  } catch (e) {
+    alert('Clipboard access denied.\nPlease allow clipboard access in your browser, or paste the text manually into the browser console and call window._ui.parseCreoText(name, text).');
+    return;
+  }
+  const pts = parseCreoXYZ(text);
+  if (!pts || pts.length === 0) {
+    alert('No valid Creo XYZ coordinates found in clipboard.\nExpected: one number per line, groups of 3 (X, Y, Z). X and Z are used as 2D coordinates.');
+    return;
+  }
+  state.objects[name].points = pts;
+  updatePropsPanel();
+  draw();
+}
+
+// Parse Creo XYZ clipboard text: one number per line, groups of 3.
+// Returns array of [X, Z] pairs (ignoring Y = index 1).
+function parseCreoXYZ(text) {
+  const nums = text.trim().split(/[\r\n]+/)
+    .map(l => l.trim())
+    .filter(l => l !== '' && !isNaN(parseFloat(l)))
+    .map(l => parseFloat(l));
+  if (nums.length < 6 || nums.length % 3 !== 0) {
+    // Try to recover partial data — drop trailing incomplete group
+    const usable = nums.slice(0, Math.floor(nums.length / 3) * 3);
+    if (usable.length < 6) return null;
+    const pts = [];
+    for (let i = 0; i < usable.length; i += 3) pts.push([usable[i], usable[i + 2]]);
+    return pts;
+  }
+  const pts = [];
+  for (let i = 0; i < nums.length; i += 3) pts.push([nums[i], nums[i + 2]]);
+  return pts;
+}
+
 export function renameObject(oldName, newName) {
   newName = newName.trim();
   if (!newName || newName === oldName || state.objects[newName]) return;
@@ -284,11 +330,11 @@ export function renderMaterials() {
         <span class="mat-name">${name}</span>
         <span class="mat-delete" onclick="window._ui.deleteMaterial('${name}')">✕</span>
       </div>
-      <div class="prop-row">
+      <div class="prop-row" style="flex-wrap:wrap;gap:4px">
         <span class="prop-key">Density</span>
         <input type="number" class="prop-val mat-density-input" value="${mat.density}" step="0.01"
-          oninput="window._ui.onMatDensityChange('${name}', this)">
-        <span style="color:var(--text3);font-size:11px;width:50px">g/cm³</span>
+          oninput="window._ui.onMatDensityChange('${name}', this)" style="min-width:60px">
+        <span style="color:var(--text3);font-size:11px;white-space:nowrap">g/cm³</span>
       </div>
       <div class="prop-row" style="margin-top:0">
         <span class="prop-key">Pb ratio</span>
