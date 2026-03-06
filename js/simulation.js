@@ -147,6 +147,63 @@ function computeRayThickness(x1, y1, x2, y2, groupDisp) {
 }
 
 // =============================================
+// DETAILED INTERSECTION ANALYSIS FOR A SINGLE RAY
+// Returns array of { objName, material, density, ratio, entryT, exitT,
+//                    entryPt, exitPt, length, pbEquiv }
+// =============================================
+export function computeRayIntersections(x1, y1, x2, y2) {
+  const pbDensity = state.materials.lead?.density || 11.34;
+  const results = [];
+
+  for (const [name, obj] of Object.entries(state.objects)) {
+    if (obj.parameters?.type !== 'surface') continue;
+    if (obj.parameters?.enabled === 'False' || obj.parameters?.enabled === false) continue;
+    const mat = state.materials[obj.parameters?.material];
+    const matName = obj.parameters?.material || '(unknown)';
+    const density = mat?.density ?? 0;
+    const ratio = mat ? density / pbDensity : 0;
+    const geo = obj.parameters?.geometry;
+
+    let segments = [];
+
+    if (geo === 'circle') {
+      const cx = obj.points[0][0], cy = obj.points[0][1];
+      const r = Math.abs(obj.points[1]);
+      const ts = rayIntersectCircle(x1, y1, x2, y2, cx, cy, r);
+      if (ts.length === 2) segments.push([ts[0], ts[1]]);
+    } else {
+      const pts = obj.points;
+      if (!pts || pts.length < 3) continue;
+      const tVals = [];
+      for (let i = 0; i < pts.length; i++) {
+        const j = (i + 1) % pts.length;
+        const t = rayIntersectSegment(x1, y1, x2, y2, pts[i][0], pts[i][1], pts[j][0], pts[j][1]);
+        if (t !== null) tVals.push(t);
+      }
+      tVals.sort((a, b) => a - b);
+      const unique = tVals.filter((v, i, arr) => i === 0 || Math.abs(v - arr[i - 1]) > 1e-7);
+      for (let i = 0; i + 1 < unique.length; i += 2) segments.push([unique[i], unique[i + 1]]);
+    }
+
+    for (const [t0, t1] of segments) {
+      const ex = x1 + t0 * (x2 - x1), ey = y1 + t0 * (y2 - y1);
+      const ox2 = x1 + t1 * (x2 - x1), oy2 = y1 + t1 * (y2 - y1);
+      const len = Math.hypot(ox2 - ex, oy2 - ey);
+      const pbEquiv = len * ratio;
+      results.push({
+        objName: name, material: matName, density, ratio,
+        entryT: t0, exitT: t1,
+        entryPt: [ex, ey], exitPt: [ox2, oy2],
+        length: len, pbEquiv
+      });
+    }
+  }
+
+  results.sort((a, b) => a.entryT - b.entryT);
+  return results;
+}
+
+// =============================================
 // SIMULATION RUNNER
 // =============================================
 let _batchTimer = null;
