@@ -49,6 +49,7 @@
       <div class="panel-tab"         onclick="window._ui.switchTab('props')">Properties</div>
       <div class="panel-tab"         onclick="window._ui.switchTab('calc')">Simulation</div>
       <div class="panel-tab"         onclick="window._ui.switchTab('mats')">Materials</div>
+      <div class="panel-tab"         onclick="window._ui.switchTab('ray')">Ray</div>
     </div>
     <div class="panel-content">
 
@@ -121,12 +122,9 @@
             <div class="prop-row" style="flex-wrap:wrap;gap:6px">
               <span class="prop-key">Min Pb equiv</span>
               <input type="range" min="0" max="500" value="0" step="0.5" class="prop-val" id="p-minThickness"
-                title="Show only rays with Pb equiv ≤ this value."
-                style="min-width:0;flex:2">
-              <input type="number" id="p-minThickness-num" value="0" min="0" step="0.5"
-                style="width:62px;background:var(--bg3);border:1px solid var(--border);border-radius:4px;color:var(--text);font-family:var(--font-mono);font-size:11px;padding:3px 5px;outline:none;flex-shrink:0"
-                title="Type a value (mm Pb)">
-              <span style="color:var(--text3);font-size:11px;white-space:nowrap">mm Pb</span>
+                title="Show only rays with Pb equiv ≤ this value. Also sets the colorbar and distribution axis."
+                style="min-width:0;flex:1">
+              <span style="color:var(--accent);font-family:var(--font-mono);font-size:11px;white-space:nowrap;min-width:60px;text-align:right" id="p-minThickness-label">0.0 mm Pb</span>
             </div>
             <div style="font-size:11px;color:var(--text3);line-height:1.6;margin-top:2px">
               Rays with thickness ≤ this threshold are displayed. This value also sets the colorbar scale and distribution X axis.
@@ -147,6 +145,13 @@
       <div class="tab-pane" id="tab-mats">
         <div id="materials-list"></div>
         <button class="small-btn accent" style="margin-top:8px" onclick="window._ui.addMaterial()">+ Add Material</button>
+      </div>
+
+      <!-- RAY DETAIL TAB -->
+      <div class="tab-pane" id="tab-ray">
+        <div id="ray-detail-content">
+          <div class="empty-state">Click on a ray in the canvas<br>to inspect it.</div>
+        </div>
       </div>
 
     </div>
