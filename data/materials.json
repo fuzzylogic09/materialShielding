@@ -1,5 +1,5 @@
 {
-  "lead":               { "density": 11.34,     "color": "#7b8fa0" },
+  "lead":               { "density": 11.3,     "color": "#7b8fa0" },
   "tungsten":           { "density": 17.0,      "color": "#c0a060" },
   "tungsten alloy WHA": { "density": 17.0,      "color": "#b09050" },
   "steel":              { "density": 7.85,      "color": "#7090a0" },
