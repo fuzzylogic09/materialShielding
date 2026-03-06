@@ -1,4 +1,4 @@
-import { state, worldToScreen, getObjectCentroid, getObjColor, thicknessColor, getObjectGroup } from './state.js';
+import { state, worldToScreen, getObjectCentroid, getObjColor, thicknessColor, getObjectGroup, computeRayDetail } from './state.js';
 
 const canvas = document.getElementById('main-canvas');
 const ctx = canvas.getContext('2d');
@@ -33,6 +33,7 @@ export function draw() {
   drawGrid();
   drawUncertaintyZones();
   drawRays();
+  drawSelectedRay();
   drawObjects();
   drawTitle();
   drawColorbar();
@@ -313,7 +314,115 @@ export function drawRays() {
   }
 }
 
-// ---- OBJECTS ----
+// ---- SELECTED RAY ----
+function drawSelectedRay() {
+  const detail = state.selectedRay;
+  if (!detail) return;
+  const { ray, segments } = detail;
+
+  const s = worldToScreen(canvas, ray.x1, ray.y1);
+  const e = worldToScreen(canvas, ray.x2, ray.y2);
+
+  ctx.save();
+
+  // Draw the ray line highlighted
+  ctx.beginPath();
+  ctx.moveTo(s.x, s.y); ctx.lineTo(e.x, e.y);
+  ctx.strokeStyle = tc('#ffffff', '#111111');
+  ctx.lineWidth = 2;
+  ctx.setLineDash([6, 3]);
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  // Draw source & receptor endpoints
+  for (const pt of [s, e]) {
+    ctx.beginPath();
+    ctx.arc(pt.x, pt.y, 5, 0, Math.PI * 2);
+    ctx.fillStyle = tc('#ffffff', '#111111');
+    ctx.fill();
+  }
+
+  // Draw each intersection segment + label
+  segments.forEach((seg, i) => {
+    const matColor = state.materials[seg.matName]?.color || '#ff7b4f';
+    const sp1 = worldToScreen(canvas, seg.p1.x, seg.p1.y);
+    const sp2 = worldToScreen(canvas, seg.p2.x, seg.p2.y);
+
+    // Thickened colored segment overlay
+    ctx.beginPath();
+    ctx.moveTo(sp1.x, sp1.y); ctx.lineTo(sp2.x, sp2.y);
+    ctx.strokeStyle = matColor;
+    ctx.lineWidth = 5;
+    ctx.globalAlpha = 0.85;
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+
+    // Entry & exit dots
+    for (const pt of [sp1, sp2]) {
+      ctx.beginPath();
+      ctx.arc(pt.x, pt.y, 4, 0, Math.PI * 2);
+      ctx.fillStyle = matColor;
+      ctx.strokeStyle = tc('#000', '#fff');
+      ctx.lineWidth = 1.5;
+      ctx.fill();
+      ctx.stroke();
+    }
+
+    // Label — placed at midpoint of the segment, offset perpendicular
+    const mx = (sp1.x + sp2.x) / 2;
+    const my = (sp1.y + sp2.y) / 2;
+    const dx = sp2.x - sp1.x, dy = sp2.y - sp1.y;
+    const len = Math.hypot(dx, dy) || 1;
+    // Perpendicular offset, alternating sides to avoid overlap
+    const side = (i % 2 === 0) ? 1 : -1;
+    const ox = (-dy / len) * 28 * side;
+    const oy = (dx / len) * 28 * side;
+    const lx = mx + ox, ly = my + oy;
+
+    const lines = [
+      seg.name,
+      `${seg.matName}  ρ=${seg.density.toFixed(2)}`,
+      `len=${seg.length.toFixed(1)} mm`,
+      `Pb≡${seg.pbEquiv.toFixed(2)} mm`
+    ];
+
+    const fontSize = Math.max(9, Math.min(11, state.view.zoom * 1.5));
+    ctx.font = `${fontSize}px JetBrains Mono, monospace`;
+    const lineH = fontSize + 2;
+    const boxW = Math.max(...lines.map(l => ctx.measureText(l).width)) + 12;
+    const boxH = lines.length * lineH + 8;
+    const bx = lx - boxW / 2, by = ly - boxH / 2;
+
+    // Connector line from segment midpoint to label
+    ctx.beginPath();
+    ctx.moveTo(mx, my); ctx.lineTo(lx, ly);
+    ctx.strokeStyle = matColor;
+    ctx.lineWidth = 1;
+    ctx.globalAlpha = 0.6;
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+
+    // Label background
+    ctx.fillStyle = tc('rgba(13,15,20,0.92)', 'rgba(245,247,252,0.93)');
+    ctx.strokeStyle = matColor;
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.roundRect(bx, by, boxW, boxH, 4);
+    ctx.fill();
+    ctx.stroke();
+
+    // Label text
+    ctx.fillStyle = matColor;
+    ctx.textAlign = 'left';
+    lines.forEach((line, li) => {
+      if (li === 0) { ctx.font = `bold ${fontSize}px JetBrains Mono, monospace`; }
+      else { ctx.font = `${fontSize}px JetBrains Mono, monospace`; ctx.fillStyle = tc('rgba(232,234,240,0.9)', 'rgba(26,30,42,0.9)'); }
+      ctx.fillText(line, bx + 6, by + lineH * li + lineH - 1);
+    });
+  });
+
+  ctx.restore();
+}
 function drawObjects() {
   for (const [name, obj] of Object.entries(state.objects)) {
     if (obj.parameters?.enabled === 'False' || obj.parameters?.enabled === false) continue;
