@@ -1,4 +1,4 @@
-import { state, screenToWorld, worldToScreen, distToSegment, pointInPolygon, getObjColor } from './state.js';
+import { state, screenToWorld, worldToScreen, distToSegment, pointInPolygon, getObjColor, computeRayDetail } from './state.js';
 import { importFromJSON } from './loader.js';
 import { canvas, draw, drawRays, resizeCanvas, fitView } from './renderer.js';
 import { startSimulation, stopSimulation } from './simulation.js';
@@ -8,7 +8,8 @@ import {
   openGroupModal, closeModal, renderGroupsModal, addGroup, deleteGroup,
   updateGroupMembers, updateGroupUncertainty, renderInlineGroups,
   updateObjParam, updateObjUncertainty, updatePoint, updateCircle, addPoint, removePoint,
-  renameObject, addMaterial, deleteMaterial, onMatDensityChange, pasteCreoPoints, deleteObject 
+  renameObject, addMaterial, deleteMaterial, onMatDensityChange, pasteCreoPoints,
+  deleteObject, renderRayDetail, clearRayDetail
 } from './ui.js';
 
 // =============================================
@@ -19,7 +20,8 @@ window._ui = {
   openGroupModal, closeModal, renderGroupsModal, addGroup, deleteGroup,
   updateGroupMembers, updateGroupUncertainty, renderInlineGroups,
   updateObjParam, updateObjUncertainty, updatePoint, updateCircle, addPoint, removePoint,
-  renameObject, addMaterial, deleteMaterial, onMatDensityChange, pasteCreoPoints, deleteObject 
+  renameObject, addMaterial, deleteMaterial, onMatDensityChange, pasteCreoPoints,
+  deleteObject, renderRayDetail, clearRayDetail
 };
 // also expose for material color inline handlers
 window.state = state;
@@ -61,8 +63,6 @@ window.onFileLoad = (event) => {
   reader.onload = (e) => {
     // Reset simulation state before loading new file
     stopSimulation();
-    state.lockedAll = true;
-    document.getElementById('lock-all-btn').textContent = '🔒 Unlock All';
     state.simulation.rays = [];
     state.simulation.raysComputed = 0;
     setRunBtn(false);
@@ -192,6 +192,7 @@ window.clearResults = () => {
   setRunBtn(false);
   state.simulation.rays = [];
   state.simulation.raysComputed = 0;
+  clearRayDetail();
   document.getElementById('progress-fill').style.width = '0%';
   document.getElementById('p-rays-done').textContent = '0 rays';
   document.getElementById('p-pct').textContent = '0%';
@@ -239,6 +240,30 @@ function getObjectAtScreen(sx, sy) {
   return null;
 }
 
+// Returns the closest visible ray within pixel tolerance, or null
+function getRayAtScreen(sx, sy) {
+  const rays = state.simulation.rays;
+  if (!rays.length) return null;
+  const minT = parseFloat(document.getElementById('p-minThickness').value) || 0;
+  const maxShow = parseInt(document.getElementById('p-plotRayCount').value) || 100;
+  const filtered = rays.filter(r => r.thickness <= minT).slice(-maxShow);
+  const TOL = 6; // px
+  let best = null, bestDist = TOL;
+  for (const r of filtered) {
+    const s = worldToScreen(canvas, r.x1, r.y1);
+    const e = worldToScreen(canvas, r.x2, r.y2);
+    // Point-to-segment distance in screen space
+    const dx = e.x - s.x, dy = e.y - s.y;
+    const l2 = dx*dx + dy*dy;
+    let t = l2 > 0 ? ((sx-s.x)*dx + (sy-s.y)*dy) / l2 : 0;
+    t = Math.max(0, Math.min(1, t));
+    const px = s.x + t*dx - sx, py = s.y + t*dy - sy;
+    const dist = Math.hypot(px, py);
+    if (dist < bestDist) { bestDist = dist; best = r; }
+  }
+  return best;
+}
+
 function onMouseDown(e) {
   e.preventDefault();
   const rect = canvas.getBoundingClientRect();
@@ -246,6 +271,9 @@ function onMouseDown(e) {
   if (e.button === 0) {
     const hit = getObjectAtScreen(sx, sy);
     if (hit) {
+      // Clear any ray selection when clicking an object
+      clearRayDetail();
+      draw();
       selectObject(hit);
       const obj = state.objects[hit];
       if (!obj.locked && !state.lockedAll) {
@@ -256,11 +284,25 @@ function onMouseDown(e) {
         canvas.classList.add('move-tool');
       }
     } else {
-      state.view.isDragging = true;
-      state.view.dragStart = { x: sx, y: sy };
-      state.view.panStart = { x: state.view.panX, y: state.view.panY };
-      canvas.classList.add('grabbing');
-      selectObject(null);
+      // Check if user clicked a ray
+      const hitRay = getRayAtScreen(sx, sy);
+      if (hitRay) {
+        selectObject(null);
+        const detail = computeRayDetail(hitRay);
+        state.selectedRay = detail;
+        renderRayDetail(detail);
+        switchTab('ray');
+        draw();
+      } else {
+        // Clicked empty space — clear ray selection and start pan
+        clearRayDetail();
+        state.view.isDragging = true;
+        state.view.dragStart = { x: sx, y: sy };
+        state.view.panStart = { x: state.view.panX, y: state.view.panY };
+        canvas.classList.add('grabbing');
+        selectObject(null);
+        draw();
+      }
     }
   }
 }
@@ -362,23 +404,28 @@ function onWheel(e) {
 // PARAM CHANGE → REDRAW (display only)
 // =============================================
 const minThicknessSlider = document.getElementById('p-minThickness');
-const minThicknessNum    = document.getElementById('p-minThickness-num');
+const minThicknessLabel = document.getElementById('p-minThickness-label');
 
 function syncSlider() {
   const val = parseFloat(minThicknessSlider.value) || 0;
-  minThicknessNum.value = val;                      // ← ADD
-  requestAnimationFrame(() => { draw(); updateResultsPanel(); });  // ← change
+  minThicknessLabel.textContent = val.toFixed(1) + ' mm Pb';
+  draw();
+  updateResultsPanel();
 }
 if (minThicknessSlider) {
   minThicknessSlider.addEventListener('input', syncSlider);
 }
 
-if (minThicknessNum) {
-  minThicknessNum.addEventListener('input', () => {
-    let val = parseFloat(minThicknessNum.value) || 0;
-    val = Math.max(0, Math.min(500, val));
-    minThicknessSlider.value = val;
-    requestAnimationFrame(() => { draw(); updateResultsPanel(); });  // ← change
+const plotRayCountEl = document.getElementById('p-plotRayCount');
+if (plotRayCountEl) plotRayCountEl.addEventListener('input', () => { draw(); updateResultsPanel(); });
+
+// Clamp ray count between 1000 and 1000000
+const rayNumberEl = document.getElementById('p-rayNumber');
+if (rayNumberEl) {
+  rayNumberEl.addEventListener('change', () => {
+    let v = parseInt(rayNumberEl.value) || 1000;
+    v = Math.max(1000, Math.min(1000000, v));
+    rayNumberEl.value = v;
   });
 }
 
