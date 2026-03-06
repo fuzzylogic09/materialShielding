@@ -1,10 +1,10 @@
-import { state, getObjectGroup, getObjColor, screenToWorld } from './state.js';
+import { state, getObjectGroup, getObjColor, screenToWorld, computeRayDetail } from './state.js';
 import { canvas, draw } from './renderer.js';
 
 // =============================================
 // TAB SWITCHING
 // =============================================
-const TAB_NAMES = ['objects', 'props', 'calc', 'mats'];
+const TAB_NAMES = ['objects', 'props', 'calc', 'mats', 'ray'];
 
 export function switchTab(tabName) {
   document.querySelectorAll('.panel-tab').forEach((t, i) => {
@@ -146,10 +146,6 @@ export function updatePropsPanel() {
       <div class="prop-row"><span class="prop-key">Group</span>
         <span style="color:${groupId?'var(--warn)':'var(--text3)'};font-size:12px;flex:1">${groupId ? state.groups[groupId].name : '—'}</span>
       </div>
-      <div class="prop-row" style="margin-top:6px">
-        <button class="small-btn" style="color:var(--warn);border-color:var(--warn);background:rgba(255,123,79,0.08)" onclick="window._ui.deleteObject('${name}')">🗑 Delete Object</button>
-      </div>  
-      
     </div>
 
     ${type === 'surface' ? `
@@ -163,7 +159,7 @@ export function updatePropsPanel() {
         <span style="color:var(--accent3);font-family:var(--font-mono);font-size:11px">${state.materials[matName].density} g/cm³</span>
       </div>
       <div class="prop-row"><span class="prop-key">Pb ratio</span>
-        <span style="color:var(--accent3);font-family:var(--font-mono);font-size:11px">${(state.materials[matName].density/(state.materials.lead?.density||11.3)).toFixed(3)}</span>
+        <span style="color:var(--accent3);font-family:var(--font-mono);font-size:11px">${(state.materials[matName].density/11.34).toFixed(3)}</span>
       </div>` : ''}
     </div>` : ''}
 
@@ -317,23 +313,6 @@ export function toggleLockObj(name) {
   renderObjectsList(); updatePropsPanel();
 }
 
-export function deleteObject(name) {
-  if (!state.objects[name]) return;
-  if (!confirm(`Delete "${name}"?`)) return;
-  // Remove from any groups
-  for (const g of Object.values(state.groups)) {
-    const idx = g.objectNames.indexOf(name);
-    if (idx >= 0) g.objectNames.splice(idx, 1);
-  }
-  delete state.objects[name];
-  state.selectedObj = null;
-  document.getElementById('s-selected-stat').style.display = 'none';
-  refreshUI();
-  updatePropsPanel();
-  draw();
-}
-
-
 // =============================================
 // MATERIALS  — live update of Pb ratio
 // =============================================
@@ -360,7 +339,7 @@ export function renderMaterials() {
       <div class="prop-row" style="margin-top:0">
         <span class="prop-key">Pb ratio</span>
         <span class="mat-pb-ratio" style="color:var(--accent);font-family:var(--font-mono);font-size:11px">
-          ${(mat.density/(state.materials.lead?.density||11.3)).toFixed(3)}
+          ${(mat.density/11.34).toFixed(3)}
         </span>
       </div>
     `;
@@ -371,21 +350,11 @@ export function renderMaterials() {
 export function onMatDensityChange(name, input) {
   const val = parseFloat(input.value) || 0;
   state.materials[name].density = val;
-  const pbDensity = state.materials.lead?.density || 11.3;
-
-  // If lead density changed, re-render all materials to update every ratio
-  if (name === 'lead') {
-    renderMaterials();
-    updatePropsPanel();
-    draw();
-    return;
-  }
-
-  // Update only the pb ratio span in the same mat-item, live
+  // Update the pb ratio span in the same mat-item, live
   const item = input.closest('.mat-item');
   if (item) {
     const ratioEl = item.querySelector('.mat-pb-ratio');
-    if (ratioEl) ratioEl.textContent = (val / pbDensity).toFixed(3);  // ← use pbDensity
+    if (ratioEl) ratioEl.textContent = (val / 11.34).toFixed(3);
   }
   draw();
 }
@@ -668,6 +637,75 @@ function drawDistribution(sorted, maxVal) {
   ctx.textAlign = 'left';  ctx.fillText('0', 0, h-2);
   ctx.textAlign = 'center'; ctx.fillText((maxVal/2).toFixed(1), w/2, h-2);
   ctx.textAlign = 'right'; ctx.fillText(maxVal.toFixed(1), w, h-2);
+}
+
+// =============================================
+// RAY DETAIL PANEL
+// =============================================
+export function renderRayDetail(detail) {
+  const container = document.getElementById('ray-detail-content');
+  if (!container) return;
+  const { ray, totalLen, totalPbEquiv, segments } = detail;
+  const pbDensity = state.materials.lead?.density || 11.34;
+
+  const segRows = segments.length === 0
+    ? `<div class="empty-state" style="padding:10px 0;font-size:11px">No surface intersections.</div>`
+    : segments.map((seg, i) => {
+        const matColor = state.materials[seg.matName]?.color || '#888';
+        return `
+          <div class="result-stat" style="margin-bottom:6px;padding:8px 10px">
+            <div style="display:flex;align-items:center;gap:6px;margin-bottom:5px">
+              <div style="width:10px;height:10px;border-radius:2px;background:${matColor};flex-shrink:0"></div>
+              <span style="font-weight:600;font-size:12px;color:var(--text)">${seg.name}</span>
+              <span class="badge surface" style="margin-left:auto">${seg.matName}</span>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:3px 8px;font-size:11px;font-family:var(--font-mono)">
+              <span style="color:var(--text3)">Entry</span>
+              <span style="color:var(--text2)">(${seg.p1.x.toFixed(1)}, ${seg.p1.y.toFixed(1)})</span>
+              <span style="color:var(--text3)">Exit</span>
+              <span style="color:var(--text2)">(${seg.p2.x.toFixed(1)}, ${seg.p2.y.toFixed(1)})</span>
+              <span style="color:var(--text3)">Length</span>
+              <span style="color:var(--accent3)">${seg.length.toFixed(2)} mm</span>
+              <span style="color:var(--text3)">Density</span>
+              <span style="color:var(--text2)">${seg.density.toFixed(3)} g/cm³</span>
+              <span style="color:var(--text3)">Pb ratio</span>
+              <span style="color:var(--text2)">${seg.ratio.toFixed(3)}</span>
+              <span style="color:var(--text3)">Pb equiv</span>
+              <span style="color:var(--accent);font-weight:600">${seg.pbEquiv.toFixed(2)} mm Pb</span>
+            </div>
+          </div>`;
+      }).join('');
+
+  container.innerHTML = `
+    <div class="param-group" style="margin-bottom:10px">
+      <div class="param-group-title">☢ Ray Summary</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:3px 8px;font-size:11px;font-family:var(--font-mono)">
+        <span style="color:var(--text3)">Source</span>
+        <span style="color:var(--text2)">(${ray.x1.toFixed(1)}, ${ray.y1.toFixed(1)})</span>
+        <span style="color:var(--text3)">Receptor</span>
+        <span style="color:var(--text2)">(${ray.x2.toFixed(1)}, ${ray.y2.toFixed(1)})</span>
+        <span style="color:var(--text3)">Total length</span>
+        <span style="color:var(--accent3)">${totalLen.toFixed(2)} mm</span>
+        <span style="color:var(--text3)">Surfaces hit</span>
+        <span style="color:var(--text2)">${segments.length}</span>
+        <span style="color:var(--text3)">Total Pb equiv</span>
+        <span style="color:var(--accent);font-weight:600">${totalPbEquiv.toFixed(2)} mm Pb</span>
+      </div>
+    </div>
+    <div style="font-size:10px;text-transform:uppercase;letter-spacing:0.08em;color:var(--text3);font-weight:600;margin-bottom:6px">
+      Surface Intersections
+    </div>
+    ${segRows}
+    <div style="font-size:10px;color:var(--text3);margin-top:8px;line-height:1.5">
+      Click elsewhere on the canvas to clear.
+    </div>
+  `;
+}
+
+export function clearRayDetail() {
+  state.selectedRay = null;
+  const container = document.getElementById('ray-detail-content');
+  if (container) container.innerHTML = '<div class="empty-state">Click on a ray in the canvas<br>to inspect it.</div>';
 }
 
 export { };
