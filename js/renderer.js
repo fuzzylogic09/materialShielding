@@ -1,4 +1,4 @@
-import { state, worldToScreen, getObjectCentroid, getObjColor, thicknessColor, getObjectGroup, computeRayDetail } from './state.js';
+import { state, worldToScreen, getObjectCentroid, getObjColor, thicknessColor, getObjectGroup } from './state.js';
 
 const canvas = document.getElementById('main-canvas');
 const ctx = canvas.getContext('2d');
@@ -33,7 +33,6 @@ export function draw() {
   drawGrid();
   drawUncertaintyZones();
   drawRays();
-  drawSelectedRay();
   drawObjects();
   drawTitle();
   drawColorbar();
@@ -301,7 +300,10 @@ export function drawRays() {
   const maxShow = parseInt(document.getElementById('p-plotRayCount').value) || 100;
   const filtered = rays.filter(r => r.thickness <= minT);
   const toShow = filtered.slice(-maxShow);
+
+  // Draw normal rays (dim selected one so it doesn't double-draw)
   for (const r of toShow) {
+    if (state.selectedRay && r === state.selectedRay.ray) continue; // skip, drawn separately
     const s = worldToScreen(canvas, r.x1, r.y1);
     const e = worldToScreen(canvas, r.x2, r.y2);
     ctx.save();
@@ -312,117 +314,156 @@ export function drawRays() {
     ctx.stroke();
     ctx.restore();
   }
+
+  // Draw selected ray with full annotations
+  if (state.selectedRay) {
+    drawSelectedRay(state.selectedRay.ray, state.selectedRay.intersections, minT);
+  }
 }
 
-// ---- SELECTED RAY ----
-function drawSelectedRay() {
-  const detail = state.selectedRay;
-  if (!detail) return;
-  const { ray, segments } = detail;
-
+function drawSelectedRay(ray, intersections, minT) {
   const s = worldToScreen(canvas, ray.x1, ray.y1);
   const e = worldToScreen(canvas, ray.x2, ray.y2);
 
+  // Main ray line — bright white/yellow highlight
   ctx.save();
-
-  // Draw the ray line highlighted
   ctx.beginPath();
   ctx.moveTo(s.x, s.y); ctx.lineTo(e.x, e.y);
-  ctx.strokeStyle = tc('#ffffff', '#111111');
+  ctx.strokeStyle = isLight() ? 'rgba(30,30,80,0.85)' : 'rgba(255,255,200,0.9)';
   ctx.lineWidth = 2;
   ctx.setLineDash([6, 3]);
   ctx.stroke();
-  ctx.setLineDash([]);
+  ctx.restore();
 
-  // Draw source & receptor endpoints
-  for (const pt of [s, e]) {
+  // Start/end endpoints
+  _drawEndpoint(s, '▶ start', `(${ray.x1.toFixed(1)}, ${ray.y1.toFixed(1)})`, '#00d4aa');
+  _drawEndpoint(e, '◀ end',  `(${ray.x2.toFixed(1)}, ${ray.y2.toFixed(1)})`, '#4f9eff');
+
+  // Intersection markers and labels
+  if (!intersections) return;
+  const rayLen = Math.hypot(ray.x2 - ray.x1, ray.y2 - ray.y1);
+
+  intersections.forEach((seg, idx) => {
+    const entSc = worldToScreen(canvas, seg.entryPt[0], seg.entryPt[1]);
+    const extSc = worldToScreen(canvas, seg.exitPt[0], seg.exitPt[1]);
+    const color = state.materials[seg.material]?.color || '#ff7b4f';
+
+    // Thick segment inside material
+    ctx.save();
     ctx.beginPath();
-    ctx.arc(pt.x, pt.y, 5, 0, Math.PI * 2);
-    ctx.fillStyle = tc('#ffffff', '#111111');
-    ctx.fill();
-  }
-
-  // Draw each intersection segment + label
-  segments.forEach((seg, i) => {
-    const matColor = state.materials[seg.matName]?.color || '#ff7b4f';
-    const sp1 = worldToScreen(canvas, seg.p1.x, seg.p1.y);
-    const sp2 = worldToScreen(canvas, seg.p2.x, seg.p2.y);
-
-    // Thickened colored segment overlay
-    ctx.beginPath();
-    ctx.moveTo(sp1.x, sp1.y); ctx.lineTo(sp2.x, sp2.y);
-    ctx.strokeStyle = matColor;
+    ctx.moveTo(entSc.x, entSc.y); ctx.lineTo(extSc.x, extSc.y);
+    ctx.strokeStyle = color;
     ctx.lineWidth = 5;
-    ctx.globalAlpha = 0.85;
+    ctx.globalAlpha = 0.7;
     ctx.stroke();
-    ctx.globalAlpha = 1;
+    ctx.restore();
 
-    // Entry & exit dots
-    for (const pt of [sp1, sp2]) {
-      ctx.beginPath();
-      ctx.arc(pt.x, pt.y, 4, 0, Math.PI * 2);
-      ctx.fillStyle = matColor;
-      ctx.strokeStyle = tc('#000', '#fff');
-      ctx.lineWidth = 1.5;
-      ctx.fill();
-      ctx.stroke();
-    }
+    // Entry dot (filled)
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(entSc.x, entSc.y, 5, 0, Math.PI * 2);
+    ctx.fillStyle = color;
+    ctx.strokeStyle = isLight() ? '#fff' : '#0d0f14';
+    ctx.lineWidth = 1.5;
+    ctx.fill(); ctx.stroke();
+    ctx.restore();
 
-    // Label — placed at midpoint of the segment, offset perpendicular
-    const mx = (sp1.x + sp2.x) / 2;
-    const my = (sp1.y + sp2.y) / 2;
-    const dx = sp2.x - sp1.x, dy = sp2.y - sp1.y;
+    // Exit dot (hollow)
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(extSc.x, extSc.y, 5, 0, Math.PI * 2);
+    ctx.strokeStyle = color;
+    ctx.fillStyle = isLight() ? '#fff' : '#0d0f14';
+    ctx.lineWidth = 2;
+    ctx.fill(); ctx.stroke();
+    ctx.restore();
+
+    // Label positioned at midpoint of segment, offset perpendicular
+    const midX = (entSc.x + extSc.x) / 2;
+    const midY = (entSc.y + extSc.y) / 2;
+    const dx = extSc.x - entSc.x, dy = extSc.y - entSc.y;
     const len = Math.hypot(dx, dy) || 1;
-    // Perpendicular offset, alternating sides to avoid overlap
-    const side = (i % 2 === 0) ? 1 : -1;
-    const ox = (-dy / len) * 28 * side;
-    const oy = (dx / len) * 28 * side;
-    const lx = mx + ox, ly = my + oy;
+    // Perpendicular offset alternates sides
+    const side = idx % 2 === 0 ? 1 : -1;
+    const nx = -dy / len * side, ny = dx / len * side;
+    const labelX = midX + nx * 32;
+    const labelY = midY + ny * 32;
 
     const lines = [
-      seg.name,
-      `${seg.matName}  ρ=${seg.density.toFixed(2)}`,
-      `len=${seg.length.toFixed(1)} mm`,
-      `Pb≡${seg.pbEquiv.toFixed(2)} mm`
+      seg.objName,
+      `${seg.material}  ρ=${seg.density.toFixed(2)} g/cm³`,
+      `ratio: ×${seg.ratio.toFixed(3)} vs Pb`,
+      `len: ${seg.length.toFixed(2)} mm`,
+      `Pb equiv: ${seg.pbEquiv.toFixed(2)} mm`
     ];
-
-    const fontSize = Math.max(9, Math.min(11, state.view.zoom * 1.5));
-    ctx.font = `${fontSize}px JetBrains Mono, monospace`;
-    const lineH = fontSize + 2;
-    const boxW = Math.max(...lines.map(l => ctx.measureText(l).width)) + 12;
-    const boxH = lines.length * lineH + 8;
-    const bx = lx - boxW / 2, by = ly - boxH / 2;
-
-    // Connector line from segment midpoint to label
-    ctx.beginPath();
-    ctx.moveTo(mx, my); ctx.lineTo(lx, ly);
-    ctx.strokeStyle = matColor;
-    ctx.lineWidth = 1;
-    ctx.globalAlpha = 0.6;
-    ctx.stroke();
-    ctx.globalAlpha = 1;
-
-    // Label background
-    ctx.fillStyle = tc('rgba(13,15,20,0.92)', 'rgba(245,247,252,0.93)');
-    ctx.strokeStyle = matColor;
-    ctx.lineWidth = 1.5;
-    ctx.beginPath();
-    ctx.roundRect(bx, by, boxW, boxH, 4);
-    ctx.fill();
-    ctx.stroke();
-
-    // Label text
-    ctx.fillStyle = matColor;
-    ctx.textAlign = 'left';
-    lines.forEach((line, li) => {
-      if (li === 0) { ctx.font = `bold ${fontSize}px JetBrains Mono, monospace`; }
-      else { ctx.font = `${fontSize}px JetBrains Mono, monospace`; ctx.fillStyle = tc('rgba(232,234,240,0.9)', 'rgba(26,30,42,0.9)'); }
-      ctx.fillText(line, bx + 6, by + lineH * li + lineH - 1);
-    });
+    _drawCalloutBox(ctx, labelX, labelY, lines, color, midX, midY);
   });
+}
 
+function _drawEndpoint(sc, tag, coords, color) {
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(sc.x, sc.y, 6, 0, Math.PI * 2);
+  ctx.fillStyle = color + 'cc';
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 2;
+  ctx.fill(); ctx.stroke();
+  ctx.restore();
+
+  const lines = [tag, coords];
+  _drawCalloutBox(ctx, sc.x, sc.y - 36, lines, color, sc.x, sc.y);
+}
+
+function _drawCalloutBox(ctx, x, y, lines, color, anchorX, anchorY) {
+  const pad = 6, lineH = 15;
+  const font0 = `bold 11px JetBrains Mono, monospace`;
+  const fontN = `10px JetBrains Mono, monospace`;
+  ctx.font = font0;
+  let maxW = 0;
+  lines.forEach((l, i) => {
+    ctx.font = i === 0 ? font0 : fontN;
+    maxW = Math.max(maxW, ctx.measureText(l).width);
+  });
+  const bw = maxW + pad * 2;
+  const bh = lines.length * lineH + pad * 2;
+
+  // Clamp to canvas
+  let bx = x - bw / 2;
+  let by = y - bh;
+  bx = Math.max(4, Math.min(canvas.width - bw - 4, bx));
+  by = Math.max(4, Math.min(canvas.height - bh - 4, by));
+
+  // Connector line
+  ctx.save();
+  ctx.beginPath();
+  ctx.moveTo(anchorX, anchorY);
+  ctx.lineTo(bx + bw / 2, by + bh);
+  ctx.strokeStyle = color + '88';
+  ctx.lineWidth = 1;
+  ctx.setLineDash([3, 3]);
+  ctx.stroke();
+  ctx.restore();
+
+  // Box background
+  ctx.save();
+  ctx.fillStyle = isLight() ? 'rgba(240,244,255,0.95)' : 'rgba(18,22,36,0.92)';
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.roundRect(bx, by, bw, bh, 5);
+  ctx.fill(); ctx.stroke();
+
+  // Text
+  lines.forEach((line, i) => {
+    ctx.font = i === 0 ? font0 : fontN;
+    ctx.fillStyle = i === 0 ? color : (isLight() ? '#333' : '#cdd0dc');
+    ctx.textAlign = 'left';
+    ctx.fillText(line, bx + pad, by + pad + lineH * i + lineH - 3);
+  });
   ctx.restore();
 }
+
+// ---- OBJECTS ----
 function drawObjects() {
   for (const [name, obj] of Object.entries(state.objects)) {
     if (obj.parameters?.enabled === 'False' || obj.parameters?.enabled === false) continue;
