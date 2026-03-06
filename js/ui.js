@@ -163,7 +163,7 @@ export function updatePropsPanel() {
         <span style="color:var(--accent3);font-family:var(--font-mono);font-size:11px">${state.materials[matName].density} g/cm³</span>
       </div>
       <div class="prop-row"><span class="prop-key">Pb ratio</span>
-        <span style="color:var(--accent3);font-family:var(--font-mono);font-size:11px">${(state.materials[matName].density/11.34).toFixed(3)}</span>
+        <span style="color:var(--accent3);font-family:var(--font-mono);font-size:11px">${(state.materials[matName].density/(state.materials.lead?.density||11.3)).toFixed(3)}</span>
       </div>` : ''}
     </div>` : ''}
 
@@ -360,7 +360,7 @@ export function renderMaterials() {
       <div class="prop-row" style="margin-top:0">
         <span class="prop-key">Pb ratio</span>
         <span class="mat-pb-ratio" style="color:var(--accent);font-family:var(--font-mono);font-size:11px">
-          ${(mat.density/11.34).toFixed(3)}
+          ${(mat.density/(state.materials.lead?.density||11.3)).toFixed(3)}
         </span>
       </div>
     `;
@@ -371,11 +371,21 @@ export function renderMaterials() {
 export function onMatDensityChange(name, input) {
   const val = parseFloat(input.value) || 0;
   state.materials[name].density = val;
-  // Update the pb ratio span in the same mat-item, live
+  const pbDensity = state.materials.lead?.density || 11.3;
+
+  // If lead density changed, re-render all materials to update every ratio
+  if (name === 'lead') {
+    renderMaterials();
+    updatePropsPanel();
+    draw();
+    return;
+  }
+
+  // Update only the pb ratio span in the same mat-item, live
   const item = input.closest('.mat-item');
   if (item) {
     const ratioEl = item.querySelector('.mat-pb-ratio');
-    if (ratioEl) ratioEl.textContent = (val / 11.34).toFixed(3);
+    if (ratioEl) ratioEl.textContent = (val / pbDensity).toFixed(3);  // ← use pbDensity
   }
   draw();
 }
