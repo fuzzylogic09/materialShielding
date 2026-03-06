@@ -1,15 +1,15 @@
-import { state, screenToWorld, worldToScreen, distToSegment, pointInPolygon, getObjColor, computeRayDetail } from './state.js';
+import { state, screenToWorld, worldToScreen, distToSegment, pointInPolygon, getObjColor } from './state.js';
 import { importFromJSON } from './loader.js';
 import { canvas, draw, drawRays, resizeCanvas, fitView } from './renderer.js';
-import { startSimulation, stopSimulation } from './simulation.js';
+import { startSimulation, stopSimulation, computeRayIntersections } from './simulation.js';
 import {
   refreshUI, renderObjectsList, renderMaterials, selectObject, updatePropsPanel,
   switchTab, switchSubTab, updateResultsPanel, addNewObject, toggleLockObj,
   openGroupModal, closeModal, renderGroupsModal, addGroup, deleteGroup,
   updateGroupMembers, updateGroupUncertainty, renderInlineGroups,
   updateObjParam, updateObjUncertainty, updatePoint, updateCircle, addPoint, removePoint,
-  renameObject, addMaterial, deleteMaterial, onMatDensityChange, pasteCreoPoints,
-  deleteObject, renderRayDetail, clearRayDetail
+  renameObject, addMaterial, deleteMaterial, onMatDensityChange, pasteCreoPoints, deleteObject,
+  showRayDetail, clearRayDetail
 } from './ui.js';
 
 // =============================================
@@ -20,8 +20,7 @@ window._ui = {
   openGroupModal, closeModal, renderGroupsModal, addGroup, deleteGroup,
   updateGroupMembers, updateGroupUncertainty, renderInlineGroups,
   updateObjParam, updateObjUncertainty, updatePoint, updateCircle, addPoint, removePoint,
-  renameObject, addMaterial, deleteMaterial, onMatDensityChange, pasteCreoPoints,
-  deleteObject, renderRayDetail, clearRayDetail
+  renameObject, addMaterial, deleteMaterial, onMatDensityChange, pasteCreoPoints, deleteObject 
 };
 // also expose for material color inline handlers
 window.state = state;
@@ -63,6 +62,8 @@ window.onFileLoad = (event) => {
   reader.onload = (e) => {
     // Reset simulation state before loading new file
     stopSimulation();
+    state.lockedAll = true;
+    document.getElementById('lock-all-btn').textContent = '🔒 Unlock All';
     state.simulation.rays = [];
     state.simulation.raysComputed = 0;
     setRunBtn(false);
@@ -192,6 +193,7 @@ window.clearResults = () => {
   setRunBtn(false);
   state.simulation.rays = [];
   state.simulation.raysComputed = 0;
+  state.selectedRay = null;
   clearRayDetail();
   document.getElementById('progress-fill').style.width = '0%';
   document.getElementById('p-rays-done').textContent = '0 rays';
@@ -240,28 +242,28 @@ function getObjectAtScreen(sx, sy) {
   return null;
 }
 
-// Returns the closest visible ray within pixel tolerance, or null
 function getRayAtScreen(sx, sy) {
   const rays = state.simulation.rays;
   if (!rays.length) return null;
   const minT = parseFloat(document.getElementById('p-minThickness').value) || 0;
   const maxShow = parseInt(document.getElementById('p-plotRayCount').value) || 100;
-  const filtered = rays.filter(r => r.thickness <= minT).slice(-maxShow);
-  const TOL = 6; // px
-  let best = null, bestDist = TOL;
-  for (const r of filtered) {
+  const filtered = rays.filter(r => r.thickness <= minT);
+  const toShow = filtered.slice(-maxShow);
+  const TOL = 6; // pixels
+
+  // Search in reverse so most recently drawn rays are picked first
+  for (let i = toShow.length - 1; i >= 0; i--) {
+    const r = toShow[i];
     const s = worldToScreen(canvas, r.x1, r.y1);
     const e = worldToScreen(canvas, r.x2, r.y2);
-    // Point-to-segment distance in screen space
     const dx = e.x - s.x, dy = e.y - s.y;
-    const l2 = dx*dx + dy*dy;
-    let t = l2 > 0 ? ((sx-s.x)*dx + (sy-s.y)*dy) / l2 : 0;
-    t = Math.max(0, Math.min(1, t));
-    const px = s.x + t*dx - sx, py = s.y + t*dy - sy;
-    const dist = Math.hypot(px, py);
-    if (dist < bestDist) { bestDist = dist; best = r; }
+    const len2 = dx * dx + dy * dy;
+    if (len2 === 0) continue;
+    const t = Math.max(0, Math.min(1, ((sx - s.x) * dx + (sy - s.y) * dy) / len2));
+    const px = s.x + t * dx, py = s.y + t * dy;
+    if (Math.hypot(sx - px, sy - py) <= TOL) return r;
   }
-  return best;
+  return null;
 }
 
 function onMouseDown(e) {
@@ -271,9 +273,8 @@ function onMouseDown(e) {
   if (e.button === 0) {
     const hit = getObjectAtScreen(sx, sy);
     if (hit) {
-      // Clear any ray selection when clicking an object
-      clearRayDetail();
-      draw();
+      // Clear ray selection when clicking an object
+      if (state.selectedRay) { state.selectedRay = null; clearRayDetail(); draw(); }
       selectObject(hit);
       const obj = state.objects[hit];
       if (!obj.locked && !state.lockedAll) {
@@ -284,24 +285,26 @@ function onMouseDown(e) {
         canvas.classList.add('move-tool');
       }
     } else {
-      // Check if user clicked a ray
-      const hitRay = getRayAtScreen(sx, sy);
-      if (hitRay) {
-        selectObject(null);
-        const detail = computeRayDetail(hitRay);
-        state.selectedRay = detail;
-        renderRayDetail(detail);
-        switchTab('ray');
+      // Try to pick a ray first
+      const rayHit = getRayAtScreen(sx, sy);
+      if (rayHit) {
+        const intersections = computeRayIntersections(rayHit.x1, rayHit.y1, rayHit.x2, rayHit.y2);
+        state.selectedRay = { ray: rayHit, intersections };
+        showRayDetail(rayHit, intersections);
+        switchTab('calc');
         draw();
       } else {
-        // Clicked empty space — clear ray selection and start pan
-        clearRayDetail();
+        // Background click — clear both object and ray selection
         state.view.isDragging = true;
         state.view.dragStart = { x: sx, y: sy };
         state.view.panStart = { x: state.view.panX, y: state.view.panY };
         canvas.classList.add('grabbing');
         selectObject(null);
-        draw();
+        if (state.selectedRay) {
+          state.selectedRay = null;
+          clearRayDetail();
+          draw();
+        }
       }
     }
   }
@@ -375,6 +378,13 @@ function onMouseMove(e) {
     state.view.hoveredObj = hit;
     draw();
   }
+  // Show pointer cursor when hovering a ray (and not over an object)
+  if (!hit && !state.view.isDragging && !state.view.isMovingObj) {
+    const rayHover = getRayAtScreen(sx, sy);
+    canvas.style.cursor = rayHover ? 'pointer' : '';
+  } else if (hit) {
+    canvas.style.cursor = '';
+  }
 }
 
 function onMouseUp() {
@@ -404,28 +414,23 @@ function onWheel(e) {
 // PARAM CHANGE → REDRAW (display only)
 // =============================================
 const minThicknessSlider = document.getElementById('p-minThickness');
-const minThicknessLabel = document.getElementById('p-minThickness-label');
+const minThicknessNum    = document.getElementById('p-minThickness-num');
 
 function syncSlider() {
   const val = parseFloat(minThicknessSlider.value) || 0;
-  minThicknessLabel.textContent = val.toFixed(1) + ' mm Pb';
-  draw();
-  updateResultsPanel();
+  minThicknessNum.value = val;                      // ← ADD
+  requestAnimationFrame(() => { draw(); updateResultsPanel(); });  // ← change
 }
 if (minThicknessSlider) {
   minThicknessSlider.addEventListener('input', syncSlider);
 }
 
-const plotRayCountEl = document.getElementById('p-plotRayCount');
-if (plotRayCountEl) plotRayCountEl.addEventListener('input', () => { draw(); updateResultsPanel(); });
-
-// Clamp ray count between 1000 and 1000000
-const rayNumberEl = document.getElementById('p-rayNumber');
-if (rayNumberEl) {
-  rayNumberEl.addEventListener('change', () => {
-    let v = parseInt(rayNumberEl.value) || 1000;
-    v = Math.max(1000, Math.min(1000000, v));
-    rayNumberEl.value = v;
+if (minThicknessNum) {
+  minThicknessNum.addEventListener('input', () => {
+    let val = parseFloat(minThicknessNum.value) || 0;
+    val = Math.max(0, Math.min(500, val));
+    minThicknessSlider.value = val;
+    requestAnimationFrame(() => { draw(); updateResultsPanel(); });  // ← change
   });
 }
 
