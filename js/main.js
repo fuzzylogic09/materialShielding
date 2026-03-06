@@ -294,17 +294,13 @@ function onMouseDown(e) {
         switchTab('calc');
         draw();
       } else {
-        // Background click — clear both object and ray selection
+        // Background click — start pan, but don't clear ray yet (wait for mouseup)
         state.view.isDragging = true;
         state.view.dragStart = { x: sx, y: sy };
         state.view.panStart = { x: state.view.panX, y: state.view.panY };
         canvas.classList.add('grabbing');
         selectObject(null);
-        if (state.selectedRay) {
-          state.selectedRay = null;
-          clearRayDetail();
-          draw();
-        }
+        // Don't clear selectedRay here — do it in onMouseUp if it was a true click
       }
     }
   }
@@ -387,12 +383,27 @@ function onMouseMove(e) {
   }
 }
 
-function onMouseUp() {
+function onMouseUp(e) {
+  const wasDragging = state.view.isDragging;
+  const dragStart = state.view.dragStart;
+
   state.view.isDragging = false;
   state.view.isMovingObj = false;
   state.view.dragGroupStarts = null;
   state.view.dragGroupId = null;
   canvas.classList.remove('grabbing', 'move-tool');
+
+  // Only clear ray selection if the mouse barely moved (true click, not a pan)
+  if (wasDragging && dragStart) {
+    const rect = canvas.getBoundingClientRect();
+    const sx = e.clientX - rect.left, sy = e.clientY - rect.top;
+    const dist = Math.hypot(sx - dragStart.x, sy - dragStart.y);
+    if (dist < 5 && state.selectedRay) {
+      state.selectedRay = null;
+      clearRayDetail();
+      draw();
+    }
+  }
 }
 
 function onWheel(e) {
